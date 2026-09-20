@@ -1,16 +1,28 @@
 # Conversation Chat Card
+<img src="images/logo.png" alt="Conversation Chat Card" width="256">
 
 A text chat card for Home Assistant dashboards. It can talk to any `conversation.*` entity in Home Assistant, or to an OpenAI-compatible Chat Completions endpoint. Replies are rendered as Markdown. The waiting indicator can be customised or hidden.
 
-The installed card is one JavaScript file. It includes markdown-it, so it makes no runtime request to a Markdown CDN. There is no microphone or speech output.
+The card is a JavaScript module with a separate, locally hosted markdown-it dependency. Both files are included in the ZIP. There is no runtime request to a Markdown CDN and no need to install npm on Home Assistant. There is no microphone or speech output.
 
 ## Install
+### HACS (Recommended)
+1. Open HACS and add a custom repository 
+```https://github.com/shopsD/HomeAssistant-Conversation-Chat-Card```
+2. Set Type to `Dashboard` and click `Add`
+3. Search for `Conversation Chat Card` and click install
 
-1. Copy `conversation-chat-card.js` to `<config>/www/conversation-chat-card.js` on your Home Assistant instance. Create `www` and restart Home Assistant if that directory did not already exist.
-2. Go to **Settings → Dashboards → ⋮ → Resources** and add `/local/conversation-chat-card.js` as a **JavaScript module**.
-3. Refresh the dashboard. Add a **Manual** card and paste one of the configurations below.
+### Manual
+1. Copy **both** `conversation-chat-card.js` and `markdown-it.umd.min.js` from the ZIP into the **same directory** on your Home Assistant instance, such as `<config>/www/conversation-chat-card/`. Create `www` and restart Home Assistant if that directory did not already exist.
+2. Go to **Settings → Dashboards → ⋮ → Resources** and add `/local/conversation-chat-card/conversation-chat-card.js` as a **JavaScript module**. You only add the card as a resource; it imports the renderer automatically.
+3. Refresh the dashboard. Select **Conversation Chat Card** from the card picker and use the visual editor, or add a **Manual** card and paste one of the configurations below.
 
-If the card is not found, open `/local/conversation-chat-card.js` in your browser to check that Home Assistant is serving the file. After replacing the file with a new version, refresh the dashboard; if the browser still has the old copy, change the resource URL to `/local/conversation-chat-card.js?v=2`.
+
+## Visual editor
+
+The visual editor covers the backend, initial conversation entity, allowed agents, appearance, waiting indicator, all three buttons, persistence, Assist pipelines, and Chat Completions settings. It uses Home Assistant's native entity, icon, pipeline, toggle, and number controls. The entity selector chooses a `conversation.*` entity; the selector shown **inside the card** is controlled separately with `agent_picker`.
+
+Structured options such as `pipelines`, `headers`, and `parameters` use small YAML object fields within the visual editor. You can also edit all settings in the card's YAML editor. Existing YAML configurations remain valid, including the older `persist_hours` name. The browser sends Chat Completions tokens directly to the endpoint; dashboard editors can inspect saved tokens even though the form masks the field.
 
 ## Home Assistant conversation agent
 
@@ -146,4 +158,4 @@ Press **Enter** to send; use **Shift+Enter** for a new line. Markdown raw HTML a
 
 ## Licence
 
-The card is MIT licensed. The single JavaScript file contains the MIT licence for its bundled markdown-it dependency.
+The card is MIT licensed; see `LICENSE`. Its separately installed renderer is markdown-it, licensed under the MIT licence included as `markdown-it.LICENSE` in the ZIP.

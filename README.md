@@ -1,16 +1,22 @@
 # Conversation Chat Card
+![Conversation Chat Card](images/icon.png)
 
 A text chat card for Home Assistant dashboards. It can talk to any `conversation.*` entity in Home Assistant, or to an OpenAI-compatible Chat Completions endpoint. Replies are rendered as Markdown. The waiting indicator can be customised or hidden.
 
 The card is a JavaScript module with a separate, locally hosted markdown-it dependency. Both files are included in the ZIP. There is no runtime request to a Markdown CDN and no need to install npm on Home Assistant. There is no microphone or speech output.
 
 ## Install
+### HACS (Recommended)
+1. Open HACS and add a custom repository 
+```https://github.com/shopsD/HomeAssistant-Conversation-Chat-Card```
+2. Set Type to `Dashboard` and click `Add`
+3. Search for `Conversation Chat Card` and click install
 
+### Manual
 1. Copy **both** `conversation-chat-card.js` and `markdown-it.umd.min.js` from the ZIP into the **same directory** on your Home Assistant instance, such as `<config>/www/conversation-chat-card/`. Create `www` and restart Home Assistant if that directory did not already exist.
 2. Go to **Settings → Dashboards → ⋮ → Resources** and add `/local/conversation-chat-card/conversation-chat-card.js` as a **JavaScript module**. You only add the card as a resource; it imports the renderer automatically.
 3. Refresh the dashboard. Select **Conversation Chat Card** from the card picker and use the visual editor, or add a **Manual** card and paste one of the configurations below.
 
-If you previously installed the single-file version, replace `conversation-chat-card.js` and add `markdown-it.umd.min.js` **next to it**. Keep your existing resource URL. If you installed it in a HACS directory, place both files in that directory and use your existing `/local/community/.../conversation-chat-card.js` resource. Open the resource URL in your browser to check that Home Assistant is serving the card. After an update, refresh the dashboard; if you still see the old copy, append `?v=3` to the card resource URL.
 
 ## Visual editor
 

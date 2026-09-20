@@ -1,5 +1,5 @@
 # Conversation Chat Card
-<img src="images/logo.png" alt="Conversation Chat Card" width="96">
+<img src="images/logo.png" alt="Conversation Chat Card" width="256">
 
 A text chat card for Home Assistant dashboards. It can talk to any `conversation.*` entity in Home Assistant, or to an OpenAI-compatible Chat Completions endpoint. Replies are rendered as Markdown. The waiting indicator can be customised or hidden.
 

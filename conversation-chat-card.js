@@ -426,5 +426,5 @@ import './markdown-it.umd.min.js';
   }
   customElements.define(TAG, ConversationChatCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: TAG, name: 'Conversation Chat Card', description: 'Markdown chat with Home Assistant conversation agents or Chat Completions.' });
+  window.customCards.push({ type: TAG, name: 'Conversation Chat Card', description: 'Markdown chat with Home Assistant conversation agents or Chat Completions.', preview: true });
 })();

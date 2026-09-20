@@ -1,0 +1,9 @@
+{
+	"name": "Conversation Chat Card",
+	"filename": "conversation-chat-card.js",
+	"render_readme": true,
+	"zip_release": false,
+	"hide_default_branch": false,
+	"homeassistant": "2026.6.2",
+    "hacs": "2.0.0"
+}

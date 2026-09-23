@@ -1,4 +1,4 @@
-/* Conversation Chat Card 2.0.0 — Home Assistant dashboard module. MIT. Requires markdown-it.umd.min.js in the same directory. */
+/* Conversation Chat Card 2.1.0 — Home Assistant dashboard module. MIT. Requires markdown-it.umd.min.js in the same directory. */
 /* Conversation Chat Card. MIT. Install markdown-it.umd.min.js alongside this module. */
 import './markdown-it.umd.min.js';
 (() => {
@@ -6,7 +6,23 @@ import './markdown-it.umd.min.js';
   const TAG = 'conversation-chat-card';
   if (customElements.get(TAG)) return;
   const markdown = globalThis.markdownit({ html: false, linkify: true, breaks: true });
-  markdown.disable('image'); // Do not fetch URLs supplied in model responses.
+  markdown.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const token = tokens[idx];
+    const source = token.attrGet('src') || '';
+    const resolved = typeof env?.resolveImageUrl === 'function' ? env.resolveImageUrl(source) : null;
+    const alt = self.renderInlineAsText(token.children || [], options, env);
+    if (!resolved) {
+      return `<span class="md-image-blocked">[${markdown.utils.escapeHtml(alt || 'Image blocked')}]</span>`;
+    }
+    const title = token.attrGet('title');
+    return [
+      '<img src="', markdown.utils.escapeHtml(resolved),
+      '" alt="', markdown.utils.escapeHtml(alt),
+      '" loading="lazy" decoding="async" referrerpolicy="no-referrer"',
+      title ? ` title="${markdown.utils.escapeHtml(title)}"` : '',
+      '>',
+    ].join('');
+  };
   const defaultLink = markdown.renderer.rules.link_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
   markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
     tokens[idx].attrSet('target', '_blank');
@@ -20,12 +36,12 @@ import './markdown-it.umd.min.js';
     .title { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
     select { min-width:100px; flex:1; border:1px solid var(--divider-color,#ddd); border-radius:7px; background:var(--card-background-color,#fff); color:var(--primary-text-color); padding:7px }
     button { cursor:pointer; font:inherit } button:disabled { opacity:.55; cursor:default }
-    .clear, .remind { display:inline-flex; align-items:center; justify-content:center; gap:5px; background:none; border:0; padding:6px 8px; border-radius:7px; white-space:nowrap }
+    .clear, .remind, .reset { display:inline-flex; align-items:center; justify-content:center; gap:5px; background:none; border:0; padding:6px 8px; border-radius:7px; white-space:nowrap }
     .clear { margin-left:auto; color:var(--error-color,#b00020) }
     .clear:hover { background:var(--error-background-color,rgba(176,0,32,.12)) }
-    .remind { color:var(--primary-text-color) }
-    .remind:hover { background:var(--secondary-background-color,#eee) }
-    .clear ha-icon, .remind ha-icon, .send ha-icon { --mdc-icon-size:20px; width:20px; height:20px }
+    .remind, .reset { color:var(--primary-text-color) }
+    .remind:hover, .reset:hover { background:var(--secondary-background-color,#eee) }
+    .clear ha-icon, .remind ha-icon, .reset ha-icon, .stop ha-icon, .send ha-icon { --mdc-icon-size:20px; width:20px; height:20px }
     .log { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:12px; padding:14px; scroll-behavior:smooth }
     .bubble { max-width:min(90%,800px); min-width:0; box-sizing:border-box; border-radius:13px; padding:9px 13px; overflow-wrap:anywhere; line-height:1.45 }
     .user { align-self:flex-end; background:var(--primary-color,#03a9f4); color:var(--text-primary-color,#fff); white-space:pre-wrap }
@@ -37,6 +53,8 @@ import './markdown-it.umd.min.js';
     .md table { border-collapse:collapse; display:block; overflow:auto } .md th,.md td { border:1px solid var(--divider-color,#aaa); padding:4px 8px }
     .md blockquote { margin:8px 0; padding-left:10px; border-left:3px solid var(--primary-color,#03a9f4) }
     .md a { color:var(--primary-color,#03a9f4) }
+    .md img { display:block; max-width:100%; height:auto; margin:.5em 0; border-radius:7px }
+    .md-image-blocked { color:var(--secondary-text-color,#666); font-style:italic }
     details { margin-bottom:8px; border-left:2px solid var(--divider-color,#aaa); padding-left:9px; color:var(--secondary-text-color,#666) }
     summary { cursor:pointer; user-select:none; font-size:.87em } details .md { padding-top:6px; font-size:.94em }
     .status { display:flex; align-items:center; gap:8px; color:var(--secondary-text-color,#666); font-size:.84em; margin-bottom:5px }
@@ -46,6 +64,9 @@ import './markdown-it.umd.min.js';
     .foot { display:flex; gap:8px; align-items:flex-end; padding:10px 12px; border-top:1px solid var(--divider-color,#ddd) }
     textarea { flex:1; min-width:0; max-height:140px; resize:vertical; box-sizing:border-box; border:1px solid var(--divider-color,#bbb); border-radius:10px; background:var(--card-background-color,#fff); color:var(--primary-text-color); font:inherit; padding:9px; line-height:1.4 }
     .send { display:inline-flex; align-items:center; justify-content:center; gap:5px; background:var(--primary-color,#03a9f4); border:0; border-radius:9px; color:var(--text-primary-color,#fff); padding:10px 13px; min-height:40px }
+    .stop { display:inline-flex; align-items:center; justify-content:center; gap:5px; background:var(--error-color,#b00020); border:0; border-radius:9px; color:var(--text-primary-color,#fff); padding:10px 13px; min-height:40px }
+    .stop:hover { filter:brightness(.92) }
+    .stop[hidden] { display:none }
     .hint { color:var(--secondary-text-color,#666); text-align:center; margin:auto; padding:16px }
   `;
   const safe = value => String(value ?? '');
@@ -63,7 +84,7 @@ import './markdown-it.umd.min.js';
   };
 
   class ConversationChatCard extends HTMLElement {
-    static getStubConfig() { return { backend: 'home_assistant', agent_picker: true, show_header: true, show_clear_button: true, show_working_bubbles: true, show_thinking: true, send_button_mode: 'text', clear_button_mode: 'text', remind_button_mode: 'text' }; }
+    static getStubConfig() { return { backend: 'home_assistant', agent_picker: true, show_header: true, show_clear_button: true, show_stop_button: true, show_working_bubbles: true, show_thinking: true, allow_local_images: false, allow_remote_images: false, send_button_mode: 'text', clear_button_mode: 'text', remind_button_mode: 'text', reset_context_button_mode: 'text', stop_button_mode: 'text' }; }
     static getConfigForm() {
       const text = name => ({ name, selector: { text: {} } });
       const multiline = name => ({ name, selector: { text: { multiline: true } } });
@@ -82,12 +103,15 @@ import './markdown-it.umd.min.js';
           group('send_button', 'Send button', [text('send_button_text'), icon('send_button_icon'), mode('send_button_mode')]),
           group('clear_button', 'Clear chat button', [toggle('show_clear_button'), text('clear_button_text'), icon('clear_button_icon'), mode('clear_button_mode')]),
           group('remind_button', 'Remind agent button', [toggle('show_remind_button'), text('remind_button_text'), icon('remind_button_icon'), mode('remind_button_mode'), multiline('remind_prompt')]),
+          group('reset_context_button', 'Reset context button', [toggle('show_reset_context_button'), text('reset_context_button_text'), icon('reset_context_button_icon'), mode('reset_context_button_mode')]),
+          group('stop_button', 'Stop waiting button', [toggle('show_stop_button'), text('stop_button_text'), icon('stop_button_icon'), mode('stop_button_mode')]),
           group('storage', 'Conversation storage', [{ name: 'persist_minutes', selector: { number: { min: 0, mode: 'box', step: 'any', unit_of_measurement: 'min' } } }, text('storage_id')]),
+          group('images', 'Markdown images', [toggle('allow_local_images'), toggle('allow_remote_images'), { name: 'image_url_allowlist', selector: { text: { multiple: true } } }]),
           group('assist', 'Assist streaming', [{ name: 'pipeline_id', selector: { assist_pipeline: {} } }, { name: 'pipelines', selector: { object: {} } }]),
           group('completions', 'Chat Completions', [text('url'), text('model'), { name: 'token', selector: { text: { type: 'password' } } }, toggle('stream'), multiline('system_prompt'), { name: 'headers', selector: { object: {} } }, { name: 'parameters', selector: { object: {} } }]),
         ],
-        computeLabel: field => ({ backend: 'Backend', entity: 'Conversation agent', agent_picker: 'Show agent picker', agents: 'Allowed agents', title: 'Title', placeholder: 'Input placeholder', welcome: 'Welcome message', height: 'Card height', show_header: 'Show header', show_thinking: 'Show thinking', thinking_open: 'Expand thinking by default', working_message: 'Waiting message', show_working_bubbles: 'Show waiting dots', show_clear_button: 'Show Clear chat', show_remind_button: 'Show Remind agent', clear_button_text: 'Button text', remind_button_text: 'Button text', send_button_text: 'Button text', clear_button_icon: 'Icon', remind_button_icon: 'Icon', send_button_icon: 'Icon', clear_button_mode: 'Display', remind_button_mode: 'Display', send_button_mode: 'Display', remind_prompt: 'Reminder instruction', persist_minutes: 'Keep chat for (minutes)', storage_id: 'Storage ID', pipeline_id: 'Assist pipeline (same agent)', pipelines: 'Pipeline per agent', url: 'Endpoint URL', model: 'Model', token: 'Bearer token', stream: 'Stream response', system_prompt: 'System prompt', headers: 'Additional headers', parameters: 'Additional request parameters' })[field.name],
-        computeHelper: field => ({ entity: 'Pick the initial conversation agent. Leave blank to use the first available.', agents: 'Leave blank to show all agents.', persist_minutes: '0 disables storage. Existing persist_hours YAML is still accepted.', pipeline_id: 'Choose a pipeline configured for the selected conversation agent.', pipelines: 'Map conversation entity IDs to Assist pipeline IDs (YAML object).', token: 'Stored in the dashboard configuration and sent directly by your browser.', remind_prompt: 'Sent before the transcript when you press Remind agent.' })[field.name],
+        computeLabel: field => ({ backend: 'Backend', entity: 'Conversation agent', agent_picker: 'Show agent picker', agents: 'Allowed agents', title: 'Title', placeholder: 'Input placeholder', welcome: 'Welcome message', height: 'Card height', show_header: 'Show header', show_thinking: 'Show thinking', thinking_open: 'Expand thinking by default', working_message: 'Waiting message', show_working_bubbles: 'Show waiting dots', show_clear_button: 'Show Clear chat', show_remind_button: 'Show Remind agent', show_reset_context_button: 'Show Reset context', show_stop_button: 'Show while waiting', clear_button_text: 'Button text', remind_button_text: 'Button text', reset_context_button_text: 'Button text', stop_button_text: 'Button text', send_button_text: 'Button text', clear_button_icon: 'Icon', remind_button_icon: 'Icon', reset_context_button_icon: 'Icon', stop_button_icon: 'Icon', send_button_icon: 'Icon', clear_button_mode: 'Display', remind_button_mode: 'Display', reset_context_button_mode: 'Display', stop_button_mode: 'Display', send_button_mode: 'Display', remind_prompt: 'Reminder instruction', allow_local_images: 'Allow local images', allow_remote_images: 'Allow remote images', image_url_allowlist: 'Remote URL allowlist', persist_minutes: 'Keep chat for (minutes)', storage_id: 'Storage ID', pipeline_id: 'Assist pipeline (same agent)', pipelines: 'Pipeline per agent', url: 'Endpoint URL', model: 'Model', token: 'Bearer token', stream: 'Stream response', system_prompt: 'System prompt', headers: 'Additional headers', parameters: 'Additional request parameters' })[field.name],
+        computeHelper: field => ({ entity: 'Pick the initial conversation agent. Leave blank to use the first available.', agents: 'Leave blank to show all agents.', image_url_allowlist: 'Full-URL glob patterns, or regular expressions prefixed with re:. Empty denies remote images.', persist_minutes: '0 disables storage. Existing persist_hours YAML is still accepted.', pipeline_id: 'Choose a pipeline configured for the selected conversation agent.', pipelines: 'Map conversation entity IDs to Assist pipeline IDs (YAML object).', token: 'Stored in the dashboard configuration and sent directly by your browser.', remind_prompt: 'Sent before the transcript when you press Remind agent.' })[field.name],
       };
     }
     constructor() {
@@ -102,16 +126,18 @@ import './markdown-it.umd.min.js';
       this._loadedKey = '';
       this._persistedBefore = false;
       this._generation = 0;
+      this._activeRequest = null;
     }
     setConfig(config) {
       if (!config || (config.backend && !['home_assistant', 'chat_completions'].includes(config.backend))) throw new Error('backend must be home_assistant or chat_completions');
       if (config.backend === 'chat_completions' && (!config.url || !config.model)) throw new Error('Chat Completions requires url and model');
       const minutes = config.persist_minutes ?? (config.persist_hours == null ? 0 : Number(config.persist_hours) * 60);
       if (!Number.isFinite(Number(minutes)) || Number(minutes) < 0) throw new Error('persist_minutes must be >= 0');
-      for (const name of ['clear_button_mode', 'remind_button_mode', 'send_button_mode']) {
+      for (const name of ['clear_button_mode', 'remind_button_mode', 'reset_context_button_mode', 'stop_button_mode', 'send_button_mode']) {
         if (config[name] != null && !['text', 'icon', 'both'].includes(config[name])) throw new Error(`${name} must be text, icon or both`);
       }
-      this._cfg = { backend: 'home_assistant', title: 'Conversation', stream: true, show_working_bubbles: true, show_header: true, show_clear_button: true, show_remind_button: false, clear_button_text: 'Clear chat', clear_button_icon: 'mdi:delete-outline', clear_button_mode: 'text', remind_button_text: 'Remind agent', remind_button_icon: 'mdi:refresh', remind_button_mode: 'text', send_button_text: 'Send', send_button_icon: 'mdi:send', send_button_mode: 'text', working_message: '', ...config, persist_minutes: Number(minutes) };
+      const imageAllowlist = config.image_url_allowlist == null ? [] : (Array.isArray(config.image_url_allowlist) ? config.image_url_allowlist : [config.image_url_allowlist]).map(normalized).filter(Boolean);
+      this._cfg = { backend: 'home_assistant', title: 'Conversation', stream: true, show_working_bubbles: true, show_header: true, show_clear_button: true, show_remind_button: false, show_reset_context_button: false, show_stop_button: true, allow_local_images: false, allow_remote_images: false, image_url_allowlist: [], clear_button_text: 'Clear chat', clear_button_icon: 'mdi:delete-outline', clear_button_mode: 'text', remind_button_text: 'Remind agent', remind_button_icon: 'mdi:refresh', remind_button_mode: 'text', reset_context_button_text: 'Reset context', reset_context_button_icon: 'mdi:restart', reset_context_button_mode: 'text', stop_button_text: 'Stop', stop_button_icon: 'mdi:stop', stop_button_mode: 'text', send_button_text: 'Send', send_button_icon: 'mdi:send', send_button_mode: 'text', working_message: '', ...config, image_url_allowlist: imageAllowlist, persist_minutes: Number(minutes) };
       const first = this._cfg.entity || '';
       if (!this._agent || this._cfg.agent_picker === false) this._agent = first;
       this._loadedKey = '';
@@ -139,6 +165,10 @@ import './markdown-it.umd.min.js';
         this._remindButton = button('remind', this._cfg.remind_button_text, this._cfg.remind_button_icon, this._cfg.remind_button_mode);
         this._remindButton.addEventListener('click', () => this._remind()); head.append(this._remindButton);
       } else this._remindButton = null;
+      if (this._cfg.backend === 'home_assistant' && this._cfg.show_reset_context_button === true) {
+        this._resetContextButton = button('reset', this._cfg.reset_context_button_text, this._cfg.reset_context_button_icon, this._cfg.reset_context_button_mode);
+        this._resetContextButton.addEventListener('click', () => this._resetContext()); head.append(this._resetContextButton);
+      } else this._resetContextButton = null;
       if (this._cfg.backend === 'home_assistant' && this._cfg.agent_picker !== false) {
         this._select = document.createElement('select'); this._select.setAttribute('aria-label', 'Conversation agent');
         this._select.addEventListener('change', () => this._switchAgent(this._select.value)); head.append(this._select);
@@ -147,14 +177,16 @@ import './markdown-it.umd.min.js';
         this._clearButton = button('clear', this._cfg.clear_button_text, this._cfg.clear_button_icon, this._cfg.clear_button_mode);
         this._clearButton.addEventListener('click', () => { if (!this._busy) this._newChat(); }); head.append(this._clearButton);
       } else this._clearButton = null;
-      } else { this._select = null; this._clearButton = null; this._remindButton = null; }
+      } else { this._select = null; this._clearButton = null; this._remindButton = null; this._resetContextButton = null; }
       this._log = document.createElement('div'); this._log.className = 'log'; this._log.setAttribute('role', 'log'); this._log.setAttribute('aria-live', 'polite');
       const foot = document.createElement('div'); foot.className = 'foot';
       this._input = document.createElement('textarea'); this._input.rows = 1; this._input.placeholder = safe(this._cfg.placeholder || 'Type a message…'); this._input.setAttribute('aria-label', 'Message');
       this._input.addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); this._send(); } });
+      this._stopButton = this._cfg.show_stop_button === false ? null : button('stop', this._cfg.stop_button_text, this._cfg.stop_button_icon, this._cfg.stop_button_mode);
+      if (this._stopButton) { this._stopButton.hidden = true; this._stopButton.addEventListener('click', () => this._stopWaiting()); }
       const send = button('send', this._cfg.send_button_text, this._cfg.send_button_icon, this._cfg.send_button_mode);
       send.addEventListener('click', () => this._send()); this._sendButton = send;
-      foot.append(this._input, send); if (this._cfg.show_header !== false) card.append(head); card.append(this._log, foot); this.shadowRoot.append(style, card);
+      foot.append(this._input); if (this._stopButton) foot.append(this._stopButton); foot.append(send); if (this._cfg.show_header !== false) card.append(head); card.append(this._log, foot); this.shadowRoot.append(style, card);
       this._updateAgentOptions(); this._render(); this._loadIfNeeded();
     }
     _agents() {
@@ -235,19 +267,63 @@ import './markdown-it.umd.min.js';
       this._messages = []; this._conversationId = null; this._persistedBefore = false;
       this._render(); this._input?.focus();
     }
+    _resetContext() {
+      if (this._busy || this._cfg.backend !== 'home_assistant') return;
+      this._conversationId = null;
+      this._save(); this._render(); this._input?.focus();
+    }
+    _stopWaiting() {
+      const request = this._activeRequest;
+      if (!this._busy || !request) return;
+      request.cancelled = true;
+      ++this._generation;
+      try { request.controller.abort(); } catch {}
+      try { request.cancelTransport?.(); } catch {}
+      this._messages = this._messages.filter(message => message !== request.reply);
+      this._activeRequest = null;
+      this._busyState(false); this._render(); this._save();
+    }
     _busyState(busy) {
       this._busy = busy; this._sendButton.disabled = busy; this._input.disabled = busy;
       if (this._select) this._select.disabled = busy;
       if (this._clearButton) this._clearButton.disabled = busy;
       if (this._remindButton) this._remindButton.disabled = busy || !this._reminderMessages().length;
+      if (this._resetContextButton) this._resetContextButton.disabled = busy || !this._conversationId;
+      if (this._stopButton) this._stopButton.hidden = !busy;
       if (!busy) this._input.focus();
+    }
+    _imagePatternMatches(url, pattern) {
+      try {
+        if (pattern.startsWith('re:')) return new RegExp(pattern.slice(3)).test(url);
+        const expression = pattern.replace(/[.+^$|(){}[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+        return new RegExp(`^${expression}$`).test(url);
+      } catch (error) {
+        console.warn(TAG, `Ignoring invalid image allowlist pattern: ${pattern}`, error);
+        return false;
+      }
+    }
+    _resolveImageUrl(source) {
+      try {
+        const base = globalThis.location?.href;
+        if (!base) return null;
+        const url = new URL(source, base);
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+        if (url.origin === globalThis.location.origin) return this._cfg.allow_local_images === true ? url.href : null;
+        if (this._cfg.allow_remote_images !== true || !this._cfg.image_url_allowlist.length) return null;
+        return this._cfg.image_url_allowlist.some(pattern => this._imagePatternMatches(url.href, pattern)) ? url.href : null;
+      } catch {
+        return null;
+      }
+    }
+    _markdown(source) {
+      return markdown.render(safe(source), { resolveImageUrl: url => this._resolveImageUrl(url) });
     }
     _render() {
       if (!this._log) return;
       this._log.replaceChildren();
       if (this._cfg.welcome) {
         const greeting = document.createElement('div'); greeting.className = 'bubble assistant';
-        const body = document.createElement('div'); body.className = 'md'; body.innerHTML = markdown.render(safe(this._cfg.welcome));
+        const body = document.createElement('div'); body.className = 'md'; body.innerHTML = this._markdown(this._cfg.welcome);
         greeting.append(body); this._log.append(greeting);
       } else if (!this._messages.length) {
         const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = safe(this._cfg.welcome || 'Start a conversation'); this._log.append(hint);
@@ -259,7 +335,7 @@ import './markdown-it.umd.min.js';
           if (msg.thinking && this._cfg.show_thinking !== false) {
             const details = document.createElement('details'); details.open = Boolean(this._cfg.thinking_open);
             const summary = document.createElement('summary'); summary.textContent = 'Thinking';
-            const thought = document.createElement('div'); thought.className = 'md'; thought.innerHTML = markdown.render(msg.thinking);
+            const thought = document.createElement('div'); thought.className = 'md'; thought.innerHTML = this._markdown(msg.thinking);
             details.append(summary, thought); bubble.append(details);
           }
           if (msg.pending && (this._cfg.show_working_bubbles !== false || normalized(this._cfg.working_message))) {
@@ -272,11 +348,12 @@ import './markdown-it.umd.min.js';
             if (normalized(this._cfg.working_message)) { const label = document.createElement('span'); label.textContent = safe(this._cfg.working_message); status.append(label); }
             bubble.append(status);
           }
-          if (msg.text) { const body = document.createElement('div'); body.className = 'md'; body.innerHTML = markdown.render(msg.text); bubble.append(body); }
+          if (msg.text) { const body = document.createElement('div'); body.className = 'md'; body.innerHTML = this._markdown(msg.text); bubble.append(body); }
         }
         if (bubble.children.length || msg.role === 'user' || msg.role === 'error') this._log.append(bubble);
       }
       if (this._remindButton) this._remindButton.disabled = this._busy || !this._reminderMessages().length;
+      if (this._resetContextButton) this._resetContextButton.disabled = this._busy || !this._conversationId;
       this._log.scrollTop = this._log.scrollHeight;
     }
     _splitThinking(message) {
@@ -321,33 +398,39 @@ import './markdown-it.umd.min.js';
       const reply = { role: 'assistant', text: '', thinking: '', pending: true };
       this._messages.push(reply); this._render(); this._busyState(true);
       this._save();
-      const generation = this._generation;
+      const request = { generation: this._generation, reply, cancelled: false, controller: new AbortController(), cancelTransport: null };
+      this._activeRequest = request;
       try {
-        if (this._cfg.backend === 'chat_completions') await this._chatCompletions(reply, reminder ? text : null);
+        if (this._cfg.backend === 'chat_completions') await this._chatCompletions(reply, reminder ? text : null, request);
         else {
           const pipeline = this._pipelineForAgent();
-          if (pipeline) await this._runPipeline(text, pipeline, reply);
-          else await this._conversationProcess(text, reply);
+          if (pipeline) await this._runPipeline(text, pipeline, reply, request);
+          else await this._conversationProcess(text, reply, request);
         }
+        if (request.cancelled) return;
         if (!reply.text && !reply.thinking) reply.text = '(No response)';
-      } catch (error) { reply.role = 'error'; reply.text = error?.message || safe(error); reply.thinking = ''; }
+      } catch (error) {
+        if (!request.cancelled) { reply.role = 'error'; reply.text = error?.message || safe(error); reply.thinking = ''; }
+      }
       finally {
         reply.pending = false;
-        if (generation === this._generation) { this._busyState(false); this._render(); this._save(); }
+        if (this._activeRequest === request) this._activeRequest = null;
+        if (!request.cancelled && request.generation === this._generation) { this._busyState(false); this._render(); this._save(); }
       }
     }
     _pipelineForAgent() {
       const mapping = this._cfg.pipelines;
       return (mapping && typeof mapping === 'object' && mapping[this._agent]) || (this._agent === this._cfg.entity ? this._cfg.pipeline_id : null);
     }
-    async _conversationProcess(text, reply) {
+    async _conversationProcess(text, reply, request) {
       const result = await this._hass.connection.sendMessagePromise({ type: 'conversation/process', text, agent_id: this._agent, language: this._hass.language, ...(this._conversationId ? { conversation_id: this._conversationId } : {}) });
+      if (request.cancelled) return;
       if (result?.conversation_id) this._conversationId = result.conversation_id;
       const response = result?.response;
       if (response?.response_type === 'error') throw new Error(response.speech?.plain?.speech || response.data?.code || 'Conversation error');
       reply.raw = safe(response?.speech?.plain?.speech || ''); reply.text = reply.raw; this._splitThinking(reply);
     }
-    _runPipeline(text, pipeline, reply) {
+    _runPipeline(text, pipeline, reply, request) {
       return new Promise((resolve, reject) => {
         let unsubscribe = null, done = false;
         const finish = (err) => {
@@ -356,8 +439,9 @@ import './markdown-it.umd.min.js';
           if (unsubscribe) { try { unsubscribe(); } catch {} }
           if (err) reject(err); else resolve();
         };
+        request.cancelTransport = () => finish();
         this._hass.connection.subscribeMessage(event => {
-          if (done) return;
+          if (done || request.cancelled) return;
           const data = event?.data || {};
           if (event.type === 'run-start') { reply.status = 'Processing'; this._render(); }
           if (event.type === 'intent-start') { reply.status = 'Agent is responding'; this._render(); }
@@ -377,7 +461,7 @@ import './markdown-it.umd.min.js';
           .catch(finish);
       });
     }
-    async _chatCompletions(reply, reminderText = null) {
+    async _chatCompletions(reply, reminderText, request) {
       const cfg = this._cfg;
       const headers = { 'Content-Type': 'application/json', ...(cfg.headers || {}) };
       if (cfg.token) headers.Authorization = /^Bearer\s/i.test(cfg.token) ? cfg.token : `Bearer ${cfg.token}`;
@@ -388,7 +472,8 @@ import './markdown-it.umd.min.js';
           messages.push({ role: message.role, content: reminderText != null && message === this._messages.at(-2) && message.reminder ? reminderText : message.text });
         }
       }
-      const response = await fetch(cfg.url, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, messages, stream: cfg.stream !== false, ...(cfg.parameters || {}) }) });
+      const response = await fetch(cfg.url, { method: 'POST', headers, signal: request.controller.signal, body: JSON.stringify({ model: cfg.model, messages, stream: cfg.stream !== false, ...(cfg.parameters || {}) }) });
+      if (request.cancelled) return;
       if (!response.ok) throw new Error(`Chat Completions HTTP ${response.status}`);
       const type = response.headers.get('content-type') || '';
       if (cfg.stream === false || !type.includes('text/event-stream') || !response.body) {
@@ -405,6 +490,7 @@ import './markdown-it.umd.min.js';
         while (!ended) {
           const { value, done } = await reader.read();
           if (done) break;
+          if (request.cancelled) return;
           buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
           const frames = buffer.split('\n\n'); buffer = frames.pop();
           for (const frame of frames) {

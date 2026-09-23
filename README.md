@@ -20,7 +20,7 @@ The card is a JavaScript module with a separate, locally hosted markdown-it depe
 
 ## Visual editor
 
-The visual editor covers the backend, initial conversation entity, allowed agents, appearance, waiting indicator, all three buttons, persistence, Assist pipelines, and Chat Completions settings. It uses Home Assistant's native entity, icon, pipeline, toggle, and number controls. The entity selector chooses a `conversation.*` entity; the selector shown **inside the card** is controlled separately with `agent_picker`.
+The visual editor covers the backend, initial conversation entity, allowed agents, appearance, waiting indicator, button controls, Markdown images, persistence, Assist pipelines, and Chat Completions settings. It uses Home Assistant's native entity, icon, pipeline, toggle, and number controls. The entity selector chooses a `conversation.*` entity; the selector shown **inside the card** is controlled separately with `agent_picker`.
 
 Structured options such as `pipelines`, `headers`, and `parameters` use small YAML object fields within the visual editor. You can also edit all settings in the card's YAML editor. Existing YAML configurations remain valid, including the older `persist_hours` name. The browser sends Chat Completions tokens directly to the endpoint; dashboard editors can inspect saved tokens even though the form masks the field.
 
@@ -119,7 +119,56 @@ show_working_bubbles: false
 
 Button labels also serve as accessible names in icon mode. With `working_message: ''` and `show_working_bubbles: false`, no waiting bubble appears until content arrives. By default, the card shows animated dots with no waiting text.
 
+### Stop waiting
+
+The optional **Stop** control appears in the footer only while a request is pending. It is shown by default and follows the same text/icon/both pattern:
+
+```yaml
+show_stop_button: true
+stop_button_text: Stop
+stop_button_icon: mdi:stop
+stop_button_mode: both
+```
+
+Stopping immediately removes the waiting response, re-enables the input and prevents a late result from being added to the card. Chat Completions requests use `AbortController`; Assist pipeline subscriptions are unsubscribed; ordinary Home Assistant conversation requests cannot be cancelled once sent, so their eventual result is ignored. This does not guarantee that Home Assistant, the selected agent, an LLM backend or an MCP server stops its server-side work.
+
+### Resetting context
+
+**Clear chat** removes the visible transcript and browser storage and discards the Home Assistant `conversation_id`. The next message starts a new agent conversation.
+
+For Home Assistant agents, an optional **Reset context** button can discard only the `conversation_id` while leaving the displayed and persisted transcript intact:
+
+```yaml
+show_reset_context_button: true
+reset_context_button_text: Reset context
+reset_context_button_icon: mdi:restart
+reset_context_button_mode: both
+```
+
+Home Assistant has no generic conversation-context compaction operation. Reset context starts a fresh backend conversation; **Remind agent** can then deliberately send the retained transcript into it. Reset context is not shown for the Chat Completions backend because that backend resends the displayed messages with every request.
+
 **Remind agent** sends a message beginning with `remind_prompt`, followed by the displayed conversation's user and assistant messages. It excludes the welcome message, thinking text, errors, and prior reminder requests. Its own chat bubble shows the button label, while the transcript sent to the agent contains the actual messages. This may repeat context the agent already has. With Chat Completions, earlier chat messages are already sent on every request; the reminder adds the transcript to that one request. A reminder can be sent once there is a completed message in the conversation.
+
+## Markdown images
+
+Markdown images are disabled by default. Local and remote images are controlled separately:
+
+```yaml
+type: custom:conversation-chat-card
+entity: conversation.home_assistant
+allow_local_images: true
+allow_remote_images: true
+image_url_allowlist:
+  - "https://images.example.com/*"
+  - "https://*.trusted.example/*"
+  - "re:^https://cdn[0-9]+\\.example\\.net/"
+```
+
+`allow_local_images` permits relative, root-relative and absolute HTTP(S) image URLs whose origin exactly matches the Home Assistant dashboard origin. For example, `/local/example.png` serves `<config>/www/example.png`. It does not permit `file://` URLs.
+
+Remote images require both `allow_remote_images: true` and at least one matching `image_url_allowlist` entry. Patterns are matched against the complete normalized URL. Ordinary entries are anchored globs where `*` matches any sequence and `?` matches one character. Entries beginning with `re:` are JavaScript regular expressions. An empty list denies all remote images; use `"*"` only if every HTTP(S) remote image should be allowed.
+
+Only HTTP and HTTPS images are accepted. URLs containing embedded credentials and schemes such as `javascript:`, `file:`, `blob:` and `data:` are rejected. Rendered images use lazy loading and send no referrer. Raw Markdown HTML remains disabled.
 
 ## Options
 
@@ -138,14 +187,21 @@ Button labels also serve as accessible names in icon mode. With `working_message
 | `height` | `440` | Card height in pixels; minimum 280. |
 | `working_message` | Empty | Optional waiting text. |
 | `show_working_bubbles` | `true` | Show animated waiting dots. |
+| `show_stop_button` | `true` | Show Stop while a request is pending. |
+| `stop_button_text`, `stop_button_icon`, `stop_button_mode` | `Stop`, `mdi:stop`, `text` | Stop button display. |
 | `show_clear_button` | `true` | Show right-aligned Clear chat control when the header is visible. |
 | `clear_button_text`, `clear_button_icon`, `clear_button_mode` | `Clear chat`, `mdi:delete-outline`, `text` | Clear chat button display. |
 | `show_remind_button` | `false` | Show left-aligned Remind agent control when the header is visible. |
 | `remind_button_text`, `remind_button_icon`, `remind_button_mode` | `Remind agent`, `mdi:refresh`, `text` | Remind agent button display. |
 | `remind_prompt` | Built-in reminder instruction | Instruction before the transcript sent to the agent. |
+| `show_reset_context_button` | `false` | Show Reset context for Home Assistant agents when the header is visible. |
+| `reset_context_button_text`, `reset_context_button_icon`, `reset_context_button_mode` | `Reset context`, `mdi:restart`, `text` | Reset context button display. |
 | `send_button_text`, `send_button_icon`, `send_button_mode` | `Send`, `mdi:send`, `text` | Send button display. Use `text`, `icon`, or `both` for button mode. |
 | `show_thinking` | `true` | Show thinking supplied by the agent or endpoint. |
 | `thinking_open` | `false` | Start the thinking section expanded. |
+| `allow_local_images` | `false` | Allow HTTP(S) images from the Home Assistant origin. |
+| `allow_remote_images` | `false` | Allow matching external HTTP(S) images. |
+| `image_url_allowlist` | Empty | Full normalized remote URL glob patterns or `re:` regular expressions. |
 | `persist_minutes` | `0` | Browser storage lifetime in minutes; `0` disables storage. |
 | `storage_id` | `default` | Separates storage between card instances. |
 | `url`, `model` | Required for Chat Completions | Full endpoint URL and model name. |
@@ -154,7 +210,7 @@ Button labels also serve as accessible names in icon mode. With `working_message
 | `system_prompt` | None | System message for Chat Completions. |
 | `parameters` | None | Extra Chat Completions request fields. |
 
-Press **Enter** to send; use **Shift+Enter** for a new line. Markdown raw HTML and images are disabled. Thinking is shown only when the backend provides a thinking field or `<think>...</think>` content; the card does not generate it.
+Press **Enter** to send; use **Shift+Enter** for a new line. Markdown raw HTML is disabled, and images are disabled unless explicitly enabled by the image policy options. Thinking is shown only when the backend provides a thinking field or `<think>...</think>` content; the card does not generate it.
 
 ## Licence
 

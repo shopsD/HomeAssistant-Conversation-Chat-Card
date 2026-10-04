@@ -3,7 +3,7 @@
 
 A text chat card for Home Assistant dashboards. It can talk to any `conversation.*` entity in Home Assistant, or to an OpenAI-compatible Chat Completions endpoint. Replies are rendered as Markdown. The waiting indicator can be customised or hidden.
 
-The card is a JavaScript module with a separate, locally hosted markdown-it dependency. Both files are included in the ZIP. There is no runtime request to a Markdown CDN and no need to install npm on Home Assistant. There is no microphone or speech output.
+The card is a JavaScript module with a separate stylesheet and a locally hosted markdown-it dependency. All three files are included in the ZIP. There is no runtime request to a CDN and no need to install npm on Home Assistant. There is no microphone or speech output.
 
 ## Install
 ### HACS (Recommended)
@@ -13,8 +13,8 @@ The card is a JavaScript module with a separate, locally hosted markdown-it depe
 3. Search for `Conversation Chat Card` and click install
 
 ### Manual
-1. Copy **both** `conversation-chat-card.js` and `markdown-it.umd.min.js` from the ZIP into the **same directory** on your Home Assistant instance, such as `<config>/www/conversation-chat-card/`. Create `www` and restart Home Assistant if that directory did not already exist.
-2. Go to **Settings → Dashboards → ⋮ → Resources** and add `/local/conversation-chat-card/conversation-chat-card.js` as a **JavaScript module**. You only add the card as a resource; it imports the renderer automatically.
+1. Copy `conversation-chat-card.js`, `conversation-chat-card.css`, and `markdown-it.umd.min.js` from the ZIP into the **same directory** on your Home Assistant instance, such as `<config>/www/conversation-chat-card/`. Create `www` and restart Home Assistant if that directory did not already exist.
+2. Go to **Settings → Dashboards → ⋮ → Resources** and add `/local/conversation-chat-card/conversation-chat-card.js` as a **JavaScript module**. You only add the card as a resource; it loads the stylesheet and renderer automatically.
 3. Refresh the dashboard. Select **Conversation Chat Card** from the card picker and use the visual editor, or add a **Manual** card and paste one of the configurations below.
 
 
@@ -211,6 +211,17 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `parameters` | None | Extra Chat Completions request fields. |
 
 Press **Enter** to send; use **Shift+Enter** for a new line. Markdown raw HTML is disabled, and images are disabled unless explicitly enabled by the image policy options. Thinking is shown only when the backend provides a thinking field or `<think>...</think>` content; the card does not generate it.
+
+## Development
+
+Install the locked development dependencies and start the local harness:
+
+```bash
+npm ci
+npm run dev
+```
+
+The harness loads the modules in `src/` by default. Open `/dev/?dist` to test the generated HACS bundle instead. Run `npm run check` to lint the source and rebuild `dist/conversation-chat-card.js` and `dist/conversation-chat-card.css`; do not edit the generated files directly.
 
 ## Licence
 

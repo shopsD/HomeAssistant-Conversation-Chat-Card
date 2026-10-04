@@ -1,0 +1,37 @@
+:root {
+  color: #202124;
+  font-family: system-ui, sans-serif;
+  background: #f3f5f7;
+
+  --primary-color: #03a9f4;
+  --primary-text-color: #202124;
+  --secondary-text-color: #5f6368;
+  --text-primary-color: #fff;
+  --card-background-color: #fff;
+  --secondary-background-color: #eef1f4;
+  --divider-color: #d5d9dd;
+  --error-color: #b00020;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  width: min(900px, calc(100% - 32px));
+  margin: 32px auto;
+}
+
+h1 {
+  margin-bottom: 4px;
+  font-size: 1.4rem;
+}
+
+.description {
+  margin-top: 0;
+  color: var(--secondary-text-color);
+}
+
+conversation-chat-card {
+  height: 560px;
+}

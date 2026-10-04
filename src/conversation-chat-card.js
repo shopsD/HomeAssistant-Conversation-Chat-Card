@@ -4,11 +4,13 @@ import { runChatCompletions } from './backends/chat-completions.js';
 import { pipelineForAgent, runAssistPipeline, runConversationProcess } from './backends/home-assistant.js';
 import { renderMarkdown } from './markdown.js';
 import { clearStoredConversation, createStorageKey, readStoredConversation, writeStoredConversation } from './storage.js';
-import { speakText } from './text-to-speech.js';
+import { canSpeak, speakText } from './text-to-speech.js';
 import { normalized, safe, unique } from './utils.js';
 
 const TAG = 'conversation-chat-card';
-const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), import.meta.url).href;
+const moduleUrl = new URL(import.meta.url);
+const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), moduleUrl);
+stylesheetUrl.search = moduleUrl.search;
 const button = (className, label, icon, mode) => {
   const el = document.createElement('button'); 
   el.type = 'button';
@@ -65,6 +67,10 @@ export class ConversationChatCard extends HTMLElement {
       if (this._cfg && !this._log) {
         this._mount();
       }
+    }
+    disconnectedCallback() {
+      this._audio?.pause();
+      this._audio = null;
     }
     _mount() {
       if (!this._cfg) { return; }
@@ -151,6 +157,11 @@ export class ConversationChatCard extends HTMLElement {
       const send = button('send', this._cfg.send_button_text, this._cfg.send_button_icon, this._cfg.send_button_mode);
       send.addEventListener('click', () => this._send()); 
       this._sendButton = send;
+      this._speakLastButton = this._cfg.show_speak_last_button === true ? button('speak-last', this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode) : null;
+      if (this._speakLastButton) {
+        this._speakLastButton.addEventListener('click', () => this._speakLastReply());
+        foot.append(this._speakLastButton);
+      }
       foot.append(this._input); 
       if (this._stopButton) {
         foot.append(this._stopButton); 
@@ -287,6 +298,7 @@ export class ConversationChatCard extends HTMLElement {
       if (this._remindButton) {this._remindButton.disabled = busy || !this._reminderMessages().length;}
       if (this._resetContextButton) {this._resetContextButton.disabled = busy || !this._conversationId;}
       if (this._stopButton) {this._stopButton.hidden = !busy;}
+      if (this._speakLastButton) {this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();}
       if (!busy) {this._input.focus();}
     }
     _imagePatternMatches(url, pattern) {
@@ -373,11 +385,21 @@ export class ConversationChatCard extends HTMLElement {
             body.innerHTML = this._markdown(msg.text);
              bubble.append(body);
           }
+          if (!msg.pending && msg.text && this._cfg.show_speak_buttons === true) {
+            const actions = document.createElement('div');
+            actions.className = 'bubble-actions';
+            const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode);
+            speak.disabled = !this._canSpeak();
+            speak.addEventListener('click', () => this._speakReply(msg.text));
+            actions.append(speak);
+            bubble.append(actions);
+          }
         }
         if (bubble.children.length || msg.role === 'user' || msg.role === 'error') {this._log.append(bubble);}
       }
       if (this._remindButton){ this._remindButton.disabled = this._busy || !this._reminderMessages().length;}
       if (this._resetContextButton) {this._resetContextButton.disabled = this._busy || !this._conversationId;}
+      if (this._speakLastButton) {this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();}
       this._log.scrollTop = this._log.scrollHeight;
     }
     _splitThinking(message) {
@@ -467,7 +489,7 @@ export class ConversationChatCard extends HTMLElement {
           this._busyState(false); 
           this._render(); 
           this._save(); 
-          if (reply.role === 'assistant') {
+          if (reply.role === 'assistant' && this._cfg.tts_auto === true) {
             void this._speakReply(reply.text);
           }
         }
@@ -483,9 +505,40 @@ export class ConversationChatCard extends HTMLElement {
         block.append(' ');
       }
       try {
-        await speakText(this._hass, this._cfg, content.textContent);
+        await speakText(this._hass, this._cfg, content.textContent, source => this._playBrowserAudio(source));
       } catch (error) {
         console.warn(TAG, 'Could not speak assistant reply', error);
+      }
+    }
+    _canSpeak() {
+      return canSpeak(this._hass, this._cfg);
+    }
+    async _playBrowserAudio(source) {
+      if (this._audio) {
+        this._audio.pause();
+      }
+      const audio = new Audio(source);
+      this._audio = audio;
+      audio.addEventListener('ended', () => {
+        if (this._audio === audio) {
+          this._audio = null;
+        }
+      }, { once: true });
+      await audio.play();
+    }
+    _lastSpeakableMessage() {
+      for (let index = this._messages.length - 1; index >= 0; index--) {
+        const message = this._messages[index];
+        if (message.role === 'assistant' && !message.pending && normalized(message.text)) {
+          return message;
+        }
+      }
+      return null;
+    }
+    _speakLastReply() {
+      const message = this._lastSpeakableMessage();
+      if (message) {
+        void this._speakReply(message.text);
       }
     }
     _pipelineForAgent() {

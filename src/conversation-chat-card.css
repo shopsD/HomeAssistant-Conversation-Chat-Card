@@ -87,6 +87,8 @@ button:disabled {
 .clear ha-icon,
 .remind ha-icon,
 .reset ha-icon,
+.speak-response ha-icon,
+.speak-last ha-icon,
 .stop ha-icon,
 .send ha-icon {
   width: 20px;
@@ -126,6 +128,27 @@ button:disabled {
 .assistant {
   align-self: flex-start;
   background: var(--secondary-background-color, #eee);
+}
+
+.bubble-actions {
+  display: flex;
+  margin-top: 8px;
+}
+
+.speak-response {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 7px;
+  color: var(--secondary-text-color, #666);
+  background: transparent;
+  border: 1px solid var(--divider-color, #ccc);
+  border-radius: 7px;
+}
+
+.speak-response:hover {
+  background: rgb(128 128 128 / 10%);
 }
 
 .error {
@@ -284,6 +307,7 @@ textarea {
 }
 
 .send,
+.speak-last,
 .stop {
   display: inline-flex;
   min-height: 40px;
@@ -298,6 +322,11 @@ textarea {
 
 .send {
   background: var(--primary-color, #03a9f4);
+}
+
+.speak-last {
+  color: var(--primary-text-color);
+  background: var(--secondary-background-color, #eee);
 }
 
 .stop {

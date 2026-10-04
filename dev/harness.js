@@ -2,12 +2,26 @@ class HaCardMock extends HTMLElement {}
 
 class HaIconMock extends HTMLElement {
   connectedCallback() {
-    this.textContent = this.getAttribute('icon') || '';
+    this.title = this.getAttribute('icon') || '';
+    this.textContent = '◆';
   }
 }
 
 if (!customElements.get('ha-card')) customElements.define('ha-card', HaCardMock);
 if (!customElements.get('ha-icon')) customElements.define('ha-icon', HaIconMock);
+
+window.Audio = class AudioMock extends EventTarget {
+  constructor(source) {
+    super();
+    this.src = source;
+  }
+
+  pause() {}
+
+  async play() {
+    window.__lastAudioSource = this.src;
+  }
+};
 
 const entryModule = new URLSearchParams(window.location.search).has('dist')
   ? `../dist/conversation-chat-card.js${window.location.search}`
@@ -30,6 +44,10 @@ card.setConfig({
   tts_auto: true,
   tts_entity: 'tts.mock_voice',
   tts_media_player: 'media_player.mock_speaker',
+  tts_voice: 'mock-voice-name',
+  tts_current_browser: true,
+  show_speak_buttons: true,
+  show_speak_last_button: true,
 });
 
 card.hass = {
@@ -53,6 +71,13 @@ card.hass = {
     const call = { domain, service, data, target };
     window.__lastServiceCall = call;
     document.documentElement.dataset.lastServiceCall = JSON.stringify(call);
+  },
+  async callApi(method, path, data) {
+    window.__lastApiCall = { method, path, data };
+    return { path: '/api/tts_proxy/mock-audio' };
+  },
+  hassUrl(path) {
+    return new URL(path, window.location.origin).href;
   },
   connection: {
     async sendMessagePromise(message) {

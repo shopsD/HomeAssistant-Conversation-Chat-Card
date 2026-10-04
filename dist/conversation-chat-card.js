@@ -35,7 +35,16 @@ var DEFAULT_CONFIG = {
 	send_button_mode: "text",
 	working_message: "",
 	tts_auto: false,
-	tts_cache: true
+	tts_cache: true,
+	tts_current_browser: false,
+	show_speak_buttons: false,
+	speak_button_text: "Speak",
+	speak_button_icon: "mdi:volume-high",
+	speak_button_mode: "both",
+	show_speak_last_button: false,
+	speak_last_button_text: "Speak last response",
+	speak_last_button_icon: "mdi:volume-high",
+	speak_last_button_mode: "icon"
 };
 function getStubConfig() {
 	return {
@@ -50,11 +59,16 @@ function getStubConfig() {
 		allow_remote_images: false,
 		tts_auto: false,
 		tts_cache: true,
+		tts_current_browser: false,
+		show_speak_buttons: false,
+		show_speak_last_button: false,
 		send_button_mode: "text",
 		clear_button_mode: "text",
 		remind_button_mode: "text",
 		reset_context_button_mode: "text",
-		stop_button_mode: "text"
+		stop_button_mode: "text",
+		speak_button_mode: "both",
+		speak_last_button_mode: "icon"
 	};
 }
 function getConfigForm() {
@@ -145,12 +159,22 @@ function getConfigForm() {
 					name: "tts_entity",
 					selector: { entity: { domain: "tts" } }
 				},
+				toggle("tts_current_browser"),
 				{
 					name: "tts_media_player",
 					selector: { entity: { domain: "media_player" } }
 				},
 				text("tts_language"),
-				toggle("tts_cache")
+				text("tts_voice"),
+				toggle("tts_cache"),
+				toggle("show_speak_buttons"),
+				text("speak_button_text"),
+				icon("speak_button_icon"),
+				mode("speak_button_mode"),
+				toggle("show_speak_last_button"),
+				text("speak_last_button_text"),
+				icon("speak_last_button_icon"),
+				mode("speak_last_button_mode")
 			]),
 			group("send_button", "Send button", [
 				text("send_button_text"),
@@ -241,9 +265,19 @@ function getConfigForm() {
 			show_working_bubbles: "Show waiting dots",
 			tts_auto: "Automatically speak replies",
 			tts_entity: "TTS engine",
+			tts_current_browser: "Play on this browser",
 			tts_media_player: "Media player",
 			tts_language: "Language",
+			tts_voice: "Voice",
 			tts_cache: "Cache generated speech",
+			show_speak_buttons: "Show Speak under replies",
+			speak_button_text: "Reply button text",
+			speak_button_icon: "Reply button icon",
+			speak_button_mode: "Reply button display",
+			show_speak_last_button: "Show Speak last by input",
+			speak_last_button_text: "Last-response button text",
+			speak_last_button_icon: "Last-response button icon",
+			speak_last_button_mode: "Last-response button display",
 			show_clear_button: "Show Clear chat",
 			show_remind_button: "Show Remind agent",
 			show_reset_context_button: "Show Reset context",
@@ -282,10 +316,14 @@ function getConfigForm() {
 		computeHelper: (field) => ({
 			entity: "Pick the initial conversation agent. Leave blank to use the first available.",
 			agents: "Leave blank to show all agents.",
-			tts_auto: "Speaks each new completed assistant reply. The TTS engine and media player are both required.",
-			tts_entity: "The tts.* provider or voice used by Home Assistant.",
-			tts_media_player: "The media_player.* entity that plays generated speech.",
+			tts_auto: "Speaks each new completed assistant reply. A TTS engine and output destination are required.",
+			tts_entity: "The tts.* provider used by Home Assistant.",
+			tts_current_browser: "Play audio on the browser displaying this card. When enabled, the media player is ignored.",
+			tts_media_player: "The media_player.* playback destination used when browser playback is disabled.",
 			tts_language: "Optional language code supported by the selected TTS engine.",
+			tts_voice: "Optional provider-specific voice name passed as options.voice.",
+			show_speak_buttons: "Adds a manual Speak control beneath each completed assistant reply.",
+			show_speak_last_button: "Adds a manual control immediately left of the message input.",
 			image_url_allowlist: "Full-URL glob patterns, or regular expressions prefixed with re:. Empty denies remote images.",
 			persist_minutes: "0 disables storage. Existing persist_hours YAML is still accepted.",
 			pipeline_id: "Choose a pipeline configured for the selected conversation agent.",
@@ -305,7 +343,9 @@ function normalizeConfig(config) {
 		"remind_button_mode",
 		"reset_context_button_mode",
 		"stop_button_mode",
-		"send_button_mode"
+		"send_button_mode",
+		"speak_button_mode",
+		"speak_last_button_mode"
 	]) if (config[name] != null && ![
 		"text",
 		"icon",
@@ -544,25 +584,44 @@ function clearStoredConversation(key) {
 }
 //#endregion
 //#region src/text-to-speech.js
-async function speakText(hass, config, message) {
+function canSpeak(hass, config) {
+	if (!normalized(config.tts_entity)) return false;
+	if (config.tts_current_browser === true) return typeof hass?.callApi === "function";
+	return typeof hass?.callService === "function" && Boolean(normalized(config.tts_media_player));
+}
+async function speakText(hass, config, message, playBrowserAudio) {
 	const text = normalized(message);
 	const ttsEntity = normalized(config.tts_entity);
 	const mediaPlayer = normalized(config.tts_media_player);
-	if (config.tts_auto !== true || !text || !ttsEntity || !mediaPlayer) return false;
+	if (!text || !canSpeak(hass, config)) return false;
 	const data = {
 		message: text,
-		media_player_entity_id: mediaPlayer,
 		cache: config.tts_cache !== false
 	};
 	const language = normalized(config.tts_language);
 	if (language) data.language = language;
+	const voice = normalized(config.tts_voice);
+	if (voice) data.options = { voice };
+	if (config.tts_current_browser === true) {
+		const result = await hass.callApi("POST", "tts_get_url", {
+			engine_id: ttsEntity,
+			...data
+		});
+		const source = result.path && hass.hassUrl ? hass.hassUrl(result.path) : result.url;
+		if (!source || typeof playBrowserAudio !== "function") throw new Error("Home Assistant did not return a playable TTS URL");
+		await playBrowserAudio(source);
+		return true;
+	}
+	data.media_player_entity_id = mediaPlayer;
 	await hass.callService("tts", "speak", data, { entity_id: ttsEntity });
 	return true;
 }
 //#endregion
 //#region src/conversation-chat-card.js
 var TAG$1 = "conversation-chat-card";
-var stylesheetUrl = new URL(conversation_chat_card_default.split("/").pop(), import.meta.url).href;
+var moduleUrl = new URL(import.meta.url);
+var stylesheetUrl = new URL(conversation_chat_card_default.split("/").pop(), moduleUrl);
+stylesheetUrl.search = moduleUrl.search;
 var button = (className, label, icon, mode) => {
 	const el = document.createElement("button");
 	el.type = "button";
@@ -621,6 +680,10 @@ var ConversationChatCard = class extends HTMLElement {
 	}
 	connectedCallback() {
 		if (this._cfg && !this._log) this._mount();
+	}
+	disconnectedCallback() {
+		this._audio?.pause();
+		this._audio = null;
 	}
 	_mount() {
 		if (!this._cfg) return;
@@ -690,6 +753,11 @@ var ConversationChatCard = class extends HTMLElement {
 		const send = button("send", this._cfg.send_button_text, this._cfg.send_button_icon, this._cfg.send_button_mode);
 		send.addEventListener("click", () => this._send());
 		this._sendButton = send;
+		this._speakLastButton = this._cfg.show_speak_last_button === true ? button("speak-last", this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode) : null;
+		if (this._speakLastButton) {
+			this._speakLastButton.addEventListener("click", () => this._speakLastReply());
+			foot.append(this._speakLastButton);
+		}
 		foot.append(this._input);
 		if (this._stopButton) foot.append(this._stopButton);
 		foot.append(send);
@@ -828,6 +896,7 @@ var ConversationChatCard = class extends HTMLElement {
 		if (this._remindButton) this._remindButton.disabled = busy || !this._reminderMessages().length;
 		if (this._resetContextButton) this._resetContextButton.disabled = busy || !this._conversationId;
 		if (this._stopButton) this._stopButton.hidden = !busy;
+		if (this._speakLastButton) this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();
 		if (!busy) this._input.focus();
 	}
 	_imagePatternMatches(url, pattern) {
@@ -912,11 +981,21 @@ var ConversationChatCard = class extends HTMLElement {
 					body.innerHTML = this._markdown(msg.text);
 					bubble.append(body);
 				}
+				if (!msg.pending && msg.text && this._cfg.show_speak_buttons === true) {
+					const actions = document.createElement("div");
+					actions.className = "bubble-actions";
+					const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode);
+					speak.disabled = !this._canSpeak();
+					speak.addEventListener("click", () => this._speakReply(msg.text));
+					actions.append(speak);
+					bubble.append(actions);
+				}
 			}
 			if (bubble.children.length || msg.role === "user" || msg.role === "error") this._log.append(bubble);
 		}
 		if (this._remindButton) this._remindButton.disabled = this._busy || !this._reminderMessages().length;
 		if (this._resetContextButton) this._resetContextButton.disabled = this._busy || !this._conversationId;
+		if (this._speakLastButton) this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();
 		this._log.scrollTop = this._log.scrollHeight;
 	}
 	_splitThinking(message) {
@@ -1019,7 +1098,7 @@ var ConversationChatCard = class extends HTMLElement {
 				this._busyState(false);
 				this._render();
 				this._save();
-				if (reply.role === "assistant") this._speakReply(reply.text);
+				if (reply.role === "assistant" && this._cfg.tts_auto === true) this._speakReply(reply.text);
 			}
 		}
 	}
@@ -1029,10 +1108,33 @@ var ConversationChatCard = class extends HTMLElement {
 		for (const lineBreak of content.querySelectorAll("br")) lineBreak.replaceWith(" ");
 		for (const block of content.querySelectorAll("p, li, blockquote, pre, h1, h2, h3, h4, h5, h6")) block.append(" ");
 		try {
-			await speakText(this._hass, this._cfg, content.textContent);
+			await speakText(this._hass, this._cfg, content.textContent, (source) => this._playBrowserAudio(source));
 		} catch (error) {
 			console.warn(TAG$1, "Could not speak assistant reply", error);
 		}
+	}
+	_canSpeak() {
+		return canSpeak(this._hass, this._cfg);
+	}
+	async _playBrowserAudio(source) {
+		if (this._audio) this._audio.pause();
+		const audio = new Audio(source);
+		this._audio = audio;
+		audio.addEventListener("ended", () => {
+			if (this._audio === audio) this._audio = null;
+		}, { once: true });
+		await audio.play();
+	}
+	_lastSpeakableMessage() {
+		for (let index = this._messages.length - 1; index >= 0; index--) {
+			const message = this._messages[index];
+			if (message.role === "assistant" && !message.pending && normalized(message.text)) return message;
+		}
+		return null;
+	}
+	_speakLastReply() {
+		const message = this._lastSpeakableMessage();
+		if (message) this._speakReply(message.text);
 	}
 	_pipelineForAgent() {
 		return pipelineForAgent(this._cfg, this._agent);

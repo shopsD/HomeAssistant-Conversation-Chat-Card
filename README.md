@@ -88,12 +88,21 @@ type: custom:conversation-chat-card
 entity: conversation.home_assistant
 tts_auto: true
 tts_entity: tts.google_en_com
-tts_media_player: media_player.kitchen_speaker
+tts_current_browser: true
+tts_voice: YOUR_PROVIDER_VOICE
+show_speak_buttons: true
+show_speak_last_button: true
 ```
 
-Choose the `tts.*` engine or voice and the `media_player.*` playback destination in the visual editor. Both are required when `tts_auto` is enabled. The optional `tts_language` value is passed to the selected provider, and `tts_cache` controls Home Assistant's generated-speech cache (enabled by default).
+Choose the `tts.*` engine and output destination in the visual editor. Enable `tts_current_browser` to play audio on the device displaying the card. Leave it disabled and choose `tts_media_player` to use Home Assistant's normal media-player output. The boolean is explicit; no entity ID or name such as `browser` has special meaning.
 
-The card speaks each newly completed assistant reply once, after streaming has finished. Markdown is converted to plain text first. Welcome messages, restored conversation history, thinking, stopped requests, and errors are not spoken. TTS service failures are logged without replacing the successful text reply. The dashboard user must be allowed to call the selected TTS service and media player.
+The optional free-text `tts_voice` value is passed to the provider as `options.voice`, while `tts_language` is passed as the action language. Supported voice names and languages depend on the selected provider. `tts_cache` controls Home Assistant's generated-speech cache and is enabled by default.
+
+With `tts_auto`, the card speaks each newly completed assistant reply once, after streaming has finished. `show_speak_buttons` adds a configurable Speak control beneath every completed assistant reply, including restored replies. `show_speak_last_button` adds a configurable control immediately left of the message input for replaying the most recent completed response. Manual controls work without `tts_auto`.
+
+Markdown is converted to plain text before speech. Welcome messages, thinking, stopped requests, and errors are not spoken automatically or offered as manual responses. TTS failures are logged without replacing the text reply. The dashboard user must have access to the selected TTS engine and, for media-player output, the selected media player.
+
+Browser playback uses the Home Assistant TTS engine to generate audio, then plays that audio locally in the dashboard. Browser autoplay policies can block automatic speech until the user has interacted with the page. Manual Speak controls originate from a user click and are generally more reliable. Starting another browser playback stops the card's previous local playback.
 
 ## Conversation storage
 
@@ -204,10 +213,16 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `working_message` | Empty | Optional waiting text. |
 | `show_working_bubbles` | `true` | Show animated waiting dots. |
 | `tts_auto` | `false` | Automatically speak each new completed assistant reply. |
-| `tts_entity` | None | Home Assistant `tts.*` engine or voice. Required with `tts_auto`. |
-| `tts_media_player` | None | Home Assistant `media_player.*` playback destination. Required with `tts_auto`. |
+| `tts_entity` | None | Home Assistant `tts.*` engine. Required for automatic or manual speech. |
+| `tts_current_browser` | `false` | Play generated speech on the browser displaying this card. |
+| `tts_media_player` | None | Home Assistant `media_player.*` destination used when `tts_current_browser` is disabled. |
 | `tts_language` | None | Optional language code passed to the TTS provider. |
+| `tts_voice` | None | Optional provider-specific voice name passed as `options.voice`. |
 | `tts_cache` | `true` | Allow Home Assistant to cache generated speech. |
+| `show_speak_buttons` | `false` | Show a Speak control beneath completed assistant replies. |
+| `speak_button_text`, `speak_button_icon`, `speak_button_mode` | `Speak`, `mdi:volume-high`, `both` | Per-response Speak button display. |
+| `show_speak_last_button` | `false` | Show a Speak last response control left of the message input. |
+| `speak_last_button_text`, `speak_last_button_icon`, `speak_last_button_mode` | `Speak last response`, `mdi:volume-high`, `icon` | Footer Speak button display. |
 | `show_stop_button` | `true` | Show Stop while a request is pending. |
 | `stop_button_text`, `stop_button_icon`, `stop_button_mode` | `Stop`, `mdi:stop`, `text` | Stop button display. |
 | `show_clear_button` | `true` | Show right-aligned Clear chat control when the header is visible. |

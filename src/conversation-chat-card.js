@@ -1,5 +1,5 @@
 import { getConfigForm, getStubConfig, normalizeConfig } from './config.js';
-import stylesheetUrl from './conversation-chat-card.css?url';
+import emittedStylesheetUrl from './conversation-chat-card.css?url';
 import { runChatCompletions } from './backends/chat-completions.js';
 import { pipelineForAgent, runAssistPipeline, runConversationProcess } from './backends/home-assistant.js';
 import { renderMarkdown } from './markdown.js';
@@ -8,6 +8,7 @@ import { speakText } from './text-to-speech.js';
 import { normalized, safe, unique } from './utils.js';
 
 const TAG = 'conversation-chat-card';
+const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), import.meta.url).href;
 const button = (className, label, icon, mode) => {
   const el = document.createElement('button'); 
   el.type = 'button';

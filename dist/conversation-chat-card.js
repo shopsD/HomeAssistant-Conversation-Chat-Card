@@ -562,6 +562,7 @@ async function speakText(hass, config, message) {
 //#endregion
 //#region src/conversation-chat-card.js
 var TAG$1 = "conversation-chat-card";
+var stylesheetUrl = new URL(conversation_chat_card_default.split("/").pop(), import.meta.url).href;
 var button = (className, label, icon, mode) => {
 	const el = document.createElement("button");
 	el.type = "button";
@@ -626,7 +627,7 @@ var ConversationChatCard = class extends HTMLElement {
 		this.shadowRoot.replaceChildren();
 		const stylesheet = document.createElement("link");
 		stylesheet.rel = "stylesheet";
-		stylesheet.href = conversation_chat_card_default;
+		stylesheet.href = stylesheetUrl;
 		const card = document.createElement("ha-card");
 		card.style.height = this._cfg.height ? `${Math.max(280, Number(this._cfg.height) || 440)}px` : "440px";
 		const head = document.createElement("div");

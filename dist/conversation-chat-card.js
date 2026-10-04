@@ -33,7 +33,9 @@ var DEFAULT_CONFIG = {
 	send_button_text: "Send",
 	send_button_icon: "mdi:send",
 	send_button_mode: "text",
-	working_message: ""
+	working_message: "",
+	tts_auto: false,
+	tts_cache: true
 };
 function getStubConfig() {
 	return {
@@ -46,6 +48,8 @@ function getStubConfig() {
 		show_thinking: true,
 		allow_local_images: false,
 		allow_remote_images: false,
+		tts_auto: false,
+		tts_cache: true,
 		send_button_mode: "text",
 		clear_button_mode: "text",
 		remind_button_mode: "text",
@@ -135,6 +139,19 @@ function getConfigForm() {
 				toggle("thinking_open")
 			]),
 			group("waiting", "While waiting", [text("working_message"), toggle("show_working_bubbles")]),
+			group("text_to_speech", "Text to speech", [
+				toggle("tts_auto"),
+				{
+					name: "tts_entity",
+					selector: { entity: { domain: "tts" } }
+				},
+				{
+					name: "tts_media_player",
+					selector: { entity: { domain: "media_player" } }
+				},
+				text("tts_language"),
+				toggle("tts_cache")
+			]),
 			group("send_button", "Send button", [
 				text("send_button_text"),
 				icon("send_button_icon"),
@@ -222,6 +239,11 @@ function getConfigForm() {
 			thinking_open: "Expand thinking by default",
 			working_message: "Waiting message",
 			show_working_bubbles: "Show waiting dots",
+			tts_auto: "Automatically speak replies",
+			tts_entity: "TTS engine",
+			tts_media_player: "Media player",
+			tts_language: "Language",
+			tts_cache: "Cache generated speech",
 			show_clear_button: "Show Clear chat",
 			show_remind_button: "Show Remind agent",
 			show_reset_context_button: "Show Reset context",
@@ -260,6 +282,10 @@ function getConfigForm() {
 		computeHelper: (field) => ({
 			entity: "Pick the initial conversation agent. Leave blank to use the first available.",
 			agents: "Leave blank to show all agents.",
+			tts_auto: "Speaks each new completed assistant reply. The TTS engine and media player are both required.",
+			tts_entity: "The tts.* provider or voice used by Home Assistant.",
+			tts_media_player: "The media_player.* entity that plays generated speech.",
+			tts_language: "Optional language code supported by the selected TTS engine.",
 			image_url_allowlist: "Full-URL glob patterns, or regular expressions prefixed with re:. Empty denies remote images.",
 			persist_minutes: "0 disables storage. Existing persist_hours YAML is still accepted.",
 			pipeline_id: "Choose a pipeline configured for the selected conversation agent.",
@@ -517,6 +543,23 @@ function clearStoredConversation(key) {
 	} catch {}
 }
 //#endregion
+//#region src/text-to-speech.js
+async function speakText(hass, config, message) {
+	const text = normalized(message);
+	const ttsEntity = normalized(config.tts_entity);
+	const mediaPlayer = normalized(config.tts_media_player);
+	if (config.tts_auto !== true || !text || !ttsEntity || !mediaPlayer) return false;
+	const data = {
+		message: text,
+		media_player_entity_id: mediaPlayer,
+		cache: config.tts_cache !== false
+	};
+	const language = normalized(config.tts_language);
+	if (language) data.language = language;
+	await hass.callService("tts", "speak", data, { entity_id: ttsEntity });
+	return true;
+}
+//#endregion
 //#region src/conversation-chat-card.js
 var TAG$1 = "conversation-chat-card";
 var button = (className, label, icon, mode) => {
@@ -647,15 +690,11 @@ var ConversationChatCard = class extends HTMLElement {
 		send.addEventListener("click", () => this._send());
 		this._sendButton = send;
 		foot.append(this._input);
-		if (this._stopButton) {
-			foot.append(this._stopButton);
-			foot.append(send);
-			if (this._cfg.show_header !== false) {
-				card.append(head);
-				card.append(this._log, foot);
-				this.shadowRoot.append(stylesheet, card);
-			}
-		}
+		if (this._stopButton) foot.append(this._stopButton);
+		foot.append(send);
+		if (this._cfg.show_header !== false) card.append(head);
+		card.append(this._log, foot);
+		this.shadowRoot.append(stylesheet, card);
 		this._updateAgentOptions();
 		this._render();
 		this._loadIfNeeded();
@@ -979,7 +1018,19 @@ var ConversationChatCard = class extends HTMLElement {
 				this._busyState(false);
 				this._render();
 				this._save();
+				if (reply.role === "assistant") this._speakReply(reply.text);
 			}
+		}
+	}
+	async _speakReply(markdown) {
+		const content = document.createElement("div");
+		content.innerHTML = this._markdown(markdown);
+		for (const lineBreak of content.querySelectorAll("br")) lineBreak.replaceWith(" ");
+		for (const block of content.querySelectorAll("p, li, blockquote, pre, h1, h2, h3, h4, h5, h6")) block.append(" ");
+		try {
+			await speakText(this._hass, this._cfg, content.textContent);
+		} catch (error) {
+			console.warn(TAG$1, "Could not speak assistant reply", error);
 		}
 	}
 	_pipelineForAgent() {

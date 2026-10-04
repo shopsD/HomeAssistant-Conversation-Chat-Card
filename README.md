@@ -1,9 +1,9 @@
 # Conversation Chat Card
 <img src="images/logo.png" alt="Conversation Chat Card" width="256">
 
-A text chat card for Home Assistant dashboards. It can talk to any `conversation.*` entity in Home Assistant, or to an OpenAI-compatible Chat Completions endpoint. Replies are rendered as Markdown. The waiting indicator can be customised or hidden.
+A chat card for Home Assistant dashboards. It can talk to any `conversation.*` entity in Home Assistant, or to an OpenAI-compatible Chat Completions endpoint. Replies are rendered as Markdown and can optionally be spoken through a Home Assistant TTS entity. The waiting indicator can be customised or hidden.
 
-The card is a JavaScript module with a separate stylesheet and a locally hosted markdown-it dependency. All three files are included in the ZIP. There is no runtime request to a CDN and no need to install npm on Home Assistant. There is no microphone or speech output.
+The card is a JavaScript module with a separate stylesheet and a locally hosted markdown-it dependency. All three files are included in the ZIP. There is no runtime request to a CDN and no need to install npm on Home Assistant. There is no microphone input.
 
 ## Install
 ### HACS (Recommended)
@@ -20,7 +20,7 @@ The card is a JavaScript module with a separate stylesheet and a locally hosted 
 
 ## Visual editor
 
-The visual editor covers the backend, initial conversation entity, allowed agents, appearance, waiting indicator, button controls, Markdown images, persistence, Assist pipelines, and Chat Completions settings. It uses Home Assistant's native entity, icon, pipeline, toggle, and number controls. The entity selector chooses a `conversation.*` entity; the selector shown **inside the card** is controlled separately with `agent_picker`.
+The visual editor covers the backend, initial conversation entity, allowed agents, appearance, waiting indicator, text to speech, button controls, Markdown images, persistence, Assist pipelines, and Chat Completions settings. It uses Home Assistant's native entity, icon, pipeline, toggle, and number controls. The entity selector chooses a `conversation.*` entity; the selector shown **inside the card** is controlled separately with `agent_picker`.
 
 Structured options such as `pipelines`, `headers`, and `parameters` use small YAML object fields within the visual editor. You can also edit all settings in the card's YAML editor. Existing YAML configurations remain valid, including the older `persist_hours` name. The browser sends Chat Completions tokens directly to the endpoint; dashboard editors can inspect saved tokens even though the form masks the field.
 
@@ -78,6 +78,22 @@ stream: true
 This backend does **not** execute tool calls. If the model returns tool calls, the card shows an error. It does not gain access to Home Assistant entities merely by being displayed in a Home Assistant dashboard.
 
 The request, including the configured token, is made in the browser. People who can inspect the dashboard can read that token. Use a token appropriate for the people who can access the dashboard. The token is not saved in the card's conversation storage.
+
+## Text to speech
+
+Completed assistant replies can be spoken automatically through Home Assistant's `tts.speak` action:
+
+```yaml
+type: custom:conversation-chat-card
+entity: conversation.home_assistant
+tts_auto: true
+tts_entity: tts.google_en_com
+tts_media_player: media_player.kitchen_speaker
+```
+
+Choose the `tts.*` engine or voice and the `media_player.*` playback destination in the visual editor. Both are required when `tts_auto` is enabled. The optional `tts_language` value is passed to the selected provider, and `tts_cache` controls Home Assistant's generated-speech cache (enabled by default).
+
+The card speaks each newly completed assistant reply once, after streaming has finished. Markdown is converted to plain text first. Welcome messages, restored conversation history, thinking, stopped requests, and errors are not spoken. TTS service failures are logged without replacing the successful text reply. The dashboard user must be allowed to call the selected TTS service and media player.
 
 ## Conversation storage
 
@@ -187,6 +203,11 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `height` | `440` | Card height in pixels; minimum 280. |
 | `working_message` | Empty | Optional waiting text. |
 | `show_working_bubbles` | `true` | Show animated waiting dots. |
+| `tts_auto` | `false` | Automatically speak each new completed assistant reply. |
+| `tts_entity` | None | Home Assistant `tts.*` engine or voice. Required with `tts_auto`. |
+| `tts_media_player` | None | Home Assistant `media_player.*` playback destination. Required with `tts_auto`. |
+| `tts_language` | None | Optional language code passed to the TTS provider. |
+| `tts_cache` | `true` | Allow Home Assistant to cache generated speech. |
 | `show_stop_button` | `true` | Show Stop while a request is pending. |
 | `stop_button_text`, `stop_button_icon`, `stop_button_mode` | `Stop`, `mdi:stop`, `text` | Stop button display. |
 | `show_clear_button` | `true` | Show right-aligned Clear chat control when the header is visible. |

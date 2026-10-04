@@ -10,7 +10,7 @@ if (!customElements.get('ha-card')) customElements.define('ha-card', HaCardMock)
 if (!customElements.get('ha-icon')) customElements.define('ha-icon', HaIconMock);
 
 const entryModule = new URLSearchParams(window.location.search).has('dist')
-  ? '../dist/conversation-chat-card.js'
+  ? `../dist/conversation-chat-card.js${window.location.search}`
   : '../src/index.js';
 await import(/* @vite-ignore */ entryModule);
 await customElements.whenDefined('conversation-chat-card');
@@ -27,6 +27,9 @@ card.setConfig({
   show_thinking: true,
   show_clear_button: true,
   show_stop_button: true,
+  tts_auto: true,
+  tts_entity: 'tts.mock_voice',
+  tts_media_player: 'media_player.mock_speaker',
 });
 
 card.hass = {
@@ -39,6 +42,17 @@ card.hass = {
     'conversation.demo_agent': {
       attributes: { friendly_name: 'Demo agent' },
     },
+    'tts.mock_voice': {
+      attributes: { friendly_name: 'Mock voice' },
+    },
+    'media_player.mock_speaker': {
+      attributes: { friendly_name: 'Mock speaker' },
+    },
+  },
+  async callService(domain, service, data, target) {
+    const call = { domain, service, data, target };
+    window.__lastServiceCall = call;
+    document.documentElement.dataset.lastServiceCall = JSON.stringify(call);
   },
   connection: {
     async sendMessagePromise(message) {

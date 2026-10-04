@@ -1,12 +1,14 @@
 import { getConfigForm, getStubConfig, normalizeConfig } from './config.js';
-import stylesheetUrl from './conversation-chat-card.css?url';
+import emittedStylesheetUrl from './conversation-chat-card.css?url';
 import { runChatCompletions } from './backends/chat-completions.js';
 import { pipelineForAgent, runAssistPipeline, runConversationProcess } from './backends/home-assistant.js';
 import { renderMarkdown } from './markdown.js';
 import { clearStoredConversation, createStorageKey, readStoredConversation, writeStoredConversation } from './storage.js';
+import { speakText } from './text-to-speech.js';
 import { normalized, safe, unique } from './utils.js';
 
 const TAG = 'conversation-chat-card';
+const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), import.meta.url).href;
 const button = (className, label, icon, mode) => {
   const el = document.createElement('button'); 
   el.type = 'button';
@@ -152,13 +154,13 @@ export class ConversationChatCard extends HTMLElement {
       foot.append(this._input); 
       if (this._stopButton) {
         foot.append(this._stopButton); 
-        foot.append(send); 
-        if (this._cfg.show_header !== false) {
-          card.append(head); 
-          card.append(this._log, foot); 
-          this.shadowRoot.append(stylesheet, card);
-        }
       }
+      foot.append(send);
+      if (this._cfg.show_header !== false) {
+        card.append(head);
+      }
+      card.append(this._log, foot);
+      this.shadowRoot.append(stylesheet, card);
       this._updateAgentOptions(); this._render(); 
       this._loadIfNeeded();
     }
@@ -465,7 +467,25 @@ export class ConversationChatCard extends HTMLElement {
           this._busyState(false); 
           this._render(); 
           this._save(); 
+          if (reply.role === 'assistant') {
+            void this._speakReply(reply.text);
+          }
         }
+      }
+    }
+    async _speakReply(markdown) {
+      const content = document.createElement('div');
+      content.innerHTML = this._markdown(markdown);
+      for (const lineBreak of content.querySelectorAll('br')) {
+        lineBreak.replaceWith(' ');
+      }
+      for (const block of content.querySelectorAll('p, li, blockquote, pre, h1, h2, h3, h4, h5, h6')) {
+        block.append(' ');
+      }
+      try {
+        await speakText(this._hass, this._cfg, content.textContent);
+      } catch (error) {
+        console.warn(TAG, 'Could not speak assistant reply', error);
       }
     }
     _pipelineForAgent() {

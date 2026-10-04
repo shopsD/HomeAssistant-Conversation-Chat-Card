@@ -28,6 +28,8 @@ const DEFAULT_CONFIG = {
   send_button_icon: 'mdi:send',
   send_button_mode: 'text',
   working_message: '',
+  tts_auto: false,
+  tts_cache: true,
 };
 
 export function getStubConfig() {
@@ -41,6 +43,8 @@ export function getStubConfig() {
     show_thinking: true,
     allow_local_images: false,
     allow_remote_images: false,
+    tts_auto: false,
+    tts_cache: true,
     send_button_mode: 'text',
     clear_button_mode: 'text',
     remind_button_mode: 'text',
@@ -64,6 +68,7 @@ export function getConfigForm() {
       { name: 'agents', selector: { entity: { domain: 'conversation', multiple: true } } },
       group('appearance', 'Appearance', [text('title'), text('placeholder'), multiline('welcome'), { name: 'height', selector: { number: { min: 280, mode: 'box', unit_of_measurement: 'px' } } }, toggle('show_header'), toggle('show_thinking'), toggle('thinking_open')]),
       group('waiting', 'While waiting', [text('working_message'), toggle('show_working_bubbles')]),
+      group('text_to_speech', 'Text to speech', [toggle('tts_auto'), { name: 'tts_entity', selector: { entity: { domain: 'tts' } } }, { name: 'tts_media_player', selector: { entity: { domain: 'media_player' } } }, text('tts_language'), toggle('tts_cache')]),
       group('send_button', 'Send button', [text('send_button_text'), icon('send_button_icon'), mode('send_button_mode')]),
       group('clear_button', 'Clear chat button', [toggle('show_clear_button'), text('clear_button_text'), icon('clear_button_icon'), mode('clear_button_mode')]),
       group('remind_button', 'Remind agent button', [toggle('show_remind_button'), text('remind_button_text'), icon('remind_button_icon'), mode('remind_button_mode'), multiline('remind_prompt')]),
@@ -74,8 +79,8 @@ export function getConfigForm() {
       group('assist', 'Assist streaming', [{ name: 'pipeline_id', selector: { assist_pipeline: {} } }, { name: 'pipelines', selector: { object: {} } }]),
       group('completions', 'Chat Completions', [text('url'), text('model'), { name: 'token', selector: { text: { type: 'password' } } }, toggle('stream'), multiline('system_prompt'), { name: 'headers', selector: { object: {} } }, { name: 'parameters', selector: { object: {} } }]),
     ],
-    computeLabel: field => ({ backend: 'Backend', entity: 'Conversation agent', agent_picker: 'Show agent picker', agents: 'Allowed agents', title: 'Title', placeholder: 'Input placeholder', welcome: 'Welcome message', height: 'Card height', show_header: 'Show header', show_thinking: 'Show thinking', thinking_open: 'Expand thinking by default', working_message: 'Waiting message', show_working_bubbles: 'Show waiting dots', show_clear_button: 'Show Clear chat', show_remind_button: 'Show Remind agent', show_reset_context_button: 'Show Reset context', show_stop_button: 'Show while waiting', clear_button_text: 'Button text', remind_button_text: 'Button text', reset_context_button_text: 'Button text', stop_button_text: 'Button text', send_button_text: 'Button text', clear_button_icon: 'Icon', remind_button_icon: 'Icon', reset_context_button_icon: 'Icon', stop_button_icon: 'Icon', send_button_icon: 'Icon', clear_button_mode: 'Display', remind_button_mode: 'Display', reset_context_button_mode: 'Display', stop_button_mode: 'Display', send_button_mode: 'Display', remind_prompt: 'Reminder instruction', allow_local_images: 'Allow local images', allow_remote_images: 'Allow remote images', image_url_allowlist: 'Remote URL allowlist', persist_minutes: 'Keep chat for (minutes)', storage_id: 'Storage ID', pipeline_id: 'Assist pipeline (same agent)', pipelines: 'Pipeline per agent', url: 'Endpoint URL', model: 'Model', token: 'Bearer token', stream: 'Stream response', system_prompt: 'System prompt', headers: 'Additional headers', parameters: 'Additional request parameters' })[field.name],
-    computeHelper: field => ({ entity: 'Pick the initial conversation agent. Leave blank to use the first available.', agents: 'Leave blank to show all agents.', image_url_allowlist: 'Full-URL glob patterns, or regular expressions prefixed with re:. Empty denies remote images.', persist_minutes: '0 disables storage. Existing persist_hours YAML is still accepted.', pipeline_id: 'Choose a pipeline configured for the selected conversation agent.', pipelines: 'Map conversation entity IDs to Assist pipeline IDs (YAML object).', token: 'Stored in the dashboard configuration and sent directly by your browser.', remind_prompt: 'Sent before the transcript when you press Remind agent.' })[field.name],
+    computeLabel: field => ({ backend: 'Backend', entity: 'Conversation agent', agent_picker: 'Show agent picker', agents: 'Allowed agents', title: 'Title', placeholder: 'Input placeholder', welcome: 'Welcome message', height: 'Card height', show_header: 'Show header', show_thinking: 'Show thinking', thinking_open: 'Expand thinking by default', working_message: 'Waiting message', show_working_bubbles: 'Show waiting dots', tts_auto: 'Automatically speak replies', tts_entity: 'TTS engine', tts_media_player: 'Media player', tts_language: 'Language', tts_cache: 'Cache generated speech', show_clear_button: 'Show Clear chat', show_remind_button: 'Show Remind agent', show_reset_context_button: 'Show Reset context', show_stop_button: 'Show while waiting', clear_button_text: 'Button text', remind_button_text: 'Button text', reset_context_button_text: 'Button text', stop_button_text: 'Button text', send_button_text: 'Button text', clear_button_icon: 'Icon', remind_button_icon: 'Icon', reset_context_button_icon: 'Icon', stop_button_icon: 'Icon', send_button_icon: 'Icon', clear_button_mode: 'Display', remind_button_mode: 'Display', reset_context_button_mode: 'Display', stop_button_mode: 'Display', send_button_mode: 'Display', remind_prompt: 'Reminder instruction', allow_local_images: 'Allow local images', allow_remote_images: 'Allow remote images', image_url_allowlist: 'Remote URL allowlist', persist_minutes: 'Keep chat for (minutes)', storage_id: 'Storage ID', pipeline_id: 'Assist pipeline (same agent)', pipelines: 'Pipeline per agent', url: 'Endpoint URL', model: 'Model', token: 'Bearer token', stream: 'Stream response', system_prompt: 'System prompt', headers: 'Additional headers', parameters: 'Additional request parameters' })[field.name],
+    computeHelper: field => ({ entity: 'Pick the initial conversation agent. Leave blank to use the first available.', agents: 'Leave blank to show all agents.', tts_auto: 'Speaks each new completed assistant reply. The TTS engine and media player are both required.', tts_entity: 'The tts.* provider or voice used by Home Assistant.', tts_media_player: 'The media_player.* entity that plays generated speech.', tts_language: 'Optional language code supported by the selected TTS engine.', image_url_allowlist: 'Full-URL glob patterns, or regular expressions prefixed with re:. Empty denies remote images.', persist_minutes: '0 disables storage. Existing persist_hours YAML is still accepted.', pipeline_id: 'Choose a pipeline configured for the selected conversation agent.', pipelines: 'Map conversation entity IDs to Assist pipeline IDs (YAML object).', token: 'Stored in the dashboard configuration and sent directly by your browser.', remind_prompt: 'Sent before the transcript when you press Remind agent.' })[field.name],
   };
 }
 

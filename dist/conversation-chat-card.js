@@ -38,12 +38,12 @@ var DEFAULT_CONFIG = {
 	tts_cache: true,
 	tts_current_browser: false,
 	show_speak_buttons: false,
-	speak_button_text: "Speak",
+	speak_button_text: "",
 	speak_button_icon: "mdi:volume-high",
 	speak_button_mode: "both",
 	speak_button_size: "small",
 	show_speak_last_button: false,
-	speak_last_button_text: "Speak last response",
+	speak_last_button_text: "",
 	speak_last_button_icon: "mdi:volume-high",
 	speak_last_button_mode: "icon"
 };
@@ -167,7 +167,7 @@ function getConfigForm() {
 				toggle("thinking_open")
 			]),
 			group("waiting", "While waiting", [text("working_message"), toggle("show_working_bubbles")]),
-			group("text_to_speech", "Text to speech", [
+			group("text_to_speech", "TTS", [
 				toggle("tts_auto"),
 				{
 					name: "tts_entity",
@@ -181,15 +181,17 @@ function getConfigForm() {
 				text("tts_language"),
 				text("tts_voice"),
 				toggle("tts_cache"),
-				toggle("show_speak_buttons"),
-				text("speak_button_text"),
-				icon("speak_button_icon"),
-				mode("speak_button_mode"),
-				size("speak_button_size"),
 				toggle("show_speak_last_button"),
 				text("speak_last_button_text"),
 				icon("speak_last_button_icon"),
 				mode("speak_last_button_mode")
+			]),
+			group("response_tts", "Response TTS", [
+				toggle("show_speak_buttons"),
+				text("speak_button_text"),
+				icon("speak_button_icon"),
+				mode("speak_button_mode"),
+				size("speak_button_size")
 			]),
 			group("send_button", "Send button", [
 				text("send_button_text"),
@@ -285,15 +287,15 @@ function getConfigForm() {
 			tts_language: "Language",
 			tts_voice: "Voice",
 			tts_cache: "Cache generated speech",
-			show_speak_buttons: "Show Speak under replies",
-			speak_button_text: "Reply button text",
-			speak_button_icon: "Reply button icon",
-			speak_button_mode: "Reply button content",
-			speak_button_size: "Reply button size",
-			show_speak_last_button: "Show Speak last by input",
-			speak_last_button_text: "Last-response button text",
-			speak_last_button_icon: "Last-response button icon",
-			speak_last_button_mode: "Last-response button content",
+			show_speak_buttons: "Show button",
+			speak_button_text: "Button text",
+			speak_button_icon: "Icon",
+			speak_button_mode: "Display",
+			speak_button_size: "Size",
+			show_speak_last_button: "Show button by input",
+			speak_last_button_text: "Button text",
+			speak_last_button_icon: "Icon",
+			speak_last_button_mode: "Display",
 			show_clear_button: "Show Clear chat",
 			show_remind_button: "Show Remind agent",
 			show_reset_context_button: "Show Reset context",
@@ -644,18 +646,18 @@ var TAG$1 = "conversation-chat-card";
 var moduleUrl = new URL(import.meta.url);
 var stylesheetUrl = new URL(conversation_chat_card_default.split("/").pop(), moduleUrl);
 stylesheetUrl.search = moduleUrl.search;
-var button = (className, label, icon, mode) => {
+var button = (className, label, icon, mode, ariaLabel = label) => {
 	const el = document.createElement("button");
 	el.type = "button";
 	el.className = className;
-	el.setAttribute("aria-label", safe(label));
+	el.setAttribute("aria-label", safe(ariaLabel));
 	if (mode === "icon" || mode === "both") {
 		const glyph = document.createElement("ha-icon");
 		glyph.setAttribute("icon", safe(icon));
 		glyph.setAttribute("aria-hidden", "true");
 		el.append(glyph);
 	}
-	if (mode !== "icon") {
+	if (mode !== "icon" && safe(label)) {
 		const span = document.createElement("span");
 		span.textContent = safe(label);
 		el.append(span);
@@ -775,7 +777,7 @@ var ConversationChatCard = class extends HTMLElement {
 		const send = button("send", this._cfg.send_button_text, this._cfg.send_button_icon, this._cfg.send_button_mode);
 		send.addEventListener("click", () => this._send());
 		this._sendButton = send;
-		this._speakLastButton = this._cfg.show_speak_last_button === true ? button("speak-last", this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode) : null;
+		this._speakLastButton = this._cfg.show_speak_last_button === true ? button("speak-last", this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode, "Speak last response") : null;
 		if (this._speakLastButton) {
 			this._speakLastButton.addEventListener("click", () => this._speakLastReply());
 			foot.append(this._speakLastButton);
@@ -1006,7 +1008,7 @@ var ConversationChatCard = class extends HTMLElement {
 				if (!msg.pending && msg.text && this._cfg.show_speak_buttons === true) {
 					const actions = document.createElement("div");
 					actions.className = "bubble-actions";
-					const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode);
+					const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, "Speak response");
 					speak.dataset.size = this._cfg.speak_button_size;
 					speak.disabled = !this._canSpeak();
 					speak.addEventListener("click", () => this._speakReply(msg.text));

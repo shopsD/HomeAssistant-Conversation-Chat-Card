@@ -87,7 +87,7 @@ button:disabled {
 .clear ha-icon,
 .remind ha-icon,
 .reset ha-icon,
-.speak-response ha-icon,
+.bubble-actions ha-icon,
 .speak-last ha-icon,
 .stop ha-icon,
 .send ha-icon {
@@ -132,10 +132,12 @@ button:disabled {
 
 .bubble-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-top: 8px;
 }
 
-.speak-response {
+.bubble-actions button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -146,52 +148,61 @@ button:disabled {
   border-radius: 7px;
 }
 
-.speak-response[data-size='tiny'] {
+.bubble-actions button[data-size='tiny'] {
   gap: 3px;
   padding: 1px 4px;
   font-size: 0.7em;
 }
 
-.speak-response[data-size='small'] {
+.bubble-actions button[data-size='small'] {
   gap: 4px;
   padding: 3px 6px;
   font-size: 0.84em;
 }
 
-.speak-response[data-size='medium'] {
+.bubble-actions button[data-size='medium'] {
   padding: 6px 9px;
   font-size: 1em;
 }
 
-.speak-response[data-size='large'] {
+.bubble-actions button[data-size='large'] {
   gap: 6px;
   padding: 9px 12px;
   font-size: 1.12em;
 }
 
-.speak-response[data-size='tiny'] ha-icon {
+.bubble-actions button[data-size='tiny'] ha-icon {
   width: 14px;
   height: 14px;
 
   --mdc-icon-size: 14px;
 }
 
-.speak-response[data-size='small'] ha-icon {
+.bubble-actions button[data-size='small'] ha-icon {
   width: 16px;
   height: 16px;
 
   --mdc-icon-size: 16px;
 }
 
-.speak-response[data-size='large'] ha-icon {
+.bubble-actions button[data-size='large'] ha-icon {
   width: 24px;
   height: 24px;
 
   --mdc-icon-size: 24px;
 }
 
-.speak-response:hover {
+.bubble-actions button:hover {
   background: rgb(128 128 128 / 10%);
+}
+
+.user .bubble-actions button {
+  color: var(--text-primary-color, #fff);
+  border-color: rgb(255 255 255 / 60%);
+}
+
+.user .bubble-actions button:hover {
+  background: rgb(255 255 255 / 12%);
 }
 
 .error {

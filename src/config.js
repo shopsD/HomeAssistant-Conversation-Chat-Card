@@ -40,6 +40,16 @@ const DEFAULT_CONFIG = {
   speak_last_button_text: '',
   speak_last_button_icon: 'mdi:volume-high',
   speak_last_button_mode: 'icon',
+  show_message_copy_button: false,
+  message_copy_button_text: 'Copy to clipboard',
+  message_copy_button_icon: 'mdi:content-copy',
+  message_copy_button_mode: 'both',
+  message_copy_button_size: 'small',
+  show_response_copy_button: false,
+  response_copy_button_text: 'Copy to clipboard',
+  response_copy_button_icon: 'mdi:content-copy',
+  response_copy_button_mode: 'both',
+  response_copy_button_size: 'small',
 };
 
 export function getStubConfig() {
@@ -66,6 +76,12 @@ export function getStubConfig() {
     speak_button_mode: 'both',
     speak_button_size: 'small',
     speak_last_button_mode: 'icon',
+    show_message_copy_button: false,
+    message_copy_button_mode: 'both',
+    message_copy_button_size: 'small',
+    show_response_copy_button: false,
+    response_copy_button_mode: 'both',
+    response_copy_button_size: 'small',
   };
 }
 
@@ -87,6 +103,8 @@ export function getConfigForm() {
       group('waiting', 'While waiting', [text('working_message'), toggle('show_working_bubbles')]),
       group('text_to_speech', 'TTS', [toggle('tts_auto'), { name: 'tts_entity', selector: { entity: { domain: 'tts' } } }, toggle('tts_current_browser'), { name: 'tts_media_player', selector: { entity: { domain: 'media_player' } } }, text('tts_language'), text('tts_voice'), toggle('tts_cache'), toggle('show_speak_last_button'), text('speak_last_button_text'), icon('speak_last_button_icon'), mode('speak_last_button_mode')]),
       group('response_tts', 'Response TTS', [toggle('show_speak_buttons'), text('speak_button_text'), icon('speak_button_icon'), mode('speak_button_mode'), size('speak_button_size')]),
+      group('message_copy', 'Message Copy', [toggle('show_message_copy_button'), text('message_copy_button_text'), icon('message_copy_button_icon'), mode('message_copy_button_mode'), size('message_copy_button_size')]),
+      group('response_copy', 'Response Copy', [toggle('show_response_copy_button'), text('response_copy_button_text'), icon('response_copy_button_icon'), mode('response_copy_button_mode'), size('response_copy_button_size')]),
       group('send_button', 'Send button', [text('send_button_text'), icon('send_button_icon'), mode('send_button_mode')]),
       group('clear_button', 'Clear chat button', [toggle('show_clear_button'), text('clear_button_text'), icon('clear_button_icon'), mode('clear_button_mode')]),
       group('remind_button', 'Remind agent button', [toggle('show_remind_button'), text('remind_button_text'), icon('remind_button_icon'), mode('remind_button_mode'), multiline('remind_prompt')]),
@@ -97,7 +115,7 @@ export function getConfigForm() {
       group('assist', 'Assist streaming', [{ name: 'pipeline_id', selector: { assist_pipeline: {} } }, { name: 'pipelines', selector: { object: {} } }]),
       group('completions', 'Chat Completions', [text('url'), text('model'), { name: 'token', selector: { text: { type: 'password' } } }, toggle('stream'), multiline('system_prompt'), { name: 'headers', selector: { object: {} } }, { name: 'parameters', selector: { object: {} } }]),
     ],
-    computeLabel: field => ({ backend: 'Backend', entity: 'Conversation agent', agent_picker: 'Show agent picker', agents: 'Allowed agents', title: 'Title', placeholder: 'Input placeholder', welcome: 'Welcome message', height: 'Card height', show_header: 'Show header', show_thinking: 'Show thinking', thinking_open: 'Expand thinking by default', working_message: 'Waiting message', show_working_bubbles: 'Show waiting dots', tts_auto: 'Automatically speak replies', tts_entity: 'TTS engine', tts_current_browser: 'Play on this browser', tts_media_player: 'Media player', tts_language: 'Language', tts_voice: 'Voice', tts_cache: 'Cache generated speech', show_speak_buttons: 'Show button', speak_button_text: 'Button text', speak_button_icon: 'Icon', speak_button_mode: 'Display', speak_button_size: 'Size', show_speak_last_button: 'Show button by input', speak_last_button_text: 'Button text', speak_last_button_icon: 'Icon', speak_last_button_mode: 'Display', show_clear_button: 'Show Clear chat', show_remind_button: 'Show Remind agent', show_reset_context_button: 'Show Reset context', show_stop_button: 'Show while waiting', clear_button_text: 'Button text', remind_button_text: 'Button text', reset_context_button_text: 'Button text', stop_button_text: 'Button text', send_button_text: 'Button text', clear_button_icon: 'Icon', remind_button_icon: 'Icon', reset_context_button_icon: 'Icon', stop_button_icon: 'Icon', send_button_icon: 'Icon', clear_button_mode: 'Display', remind_button_mode: 'Display', reset_context_button_mode: 'Display', stop_button_mode: 'Display', send_button_mode: 'Display', remind_prompt: 'Reminder instruction', allow_local_images: 'Allow local images', allow_remote_images: 'Allow remote images', image_url_allowlist: 'Remote URL allowlist', persist_minutes: 'Keep chat for (minutes)', storage_id: 'Storage ID', pipeline_id: 'Assist pipeline (same agent)', pipelines: 'Pipeline per agent', url: 'Endpoint URL', model: 'Model', token: 'Bearer token', stream: 'Stream response', system_prompt: 'System prompt', headers: 'Additional headers', parameters: 'Additional request parameters' })[field.name],
+    computeLabel: field => ({ backend: 'Backend', entity: 'Conversation agent', agent_picker: 'Show agent picker', agents: 'Allowed agents', title: 'Title', placeholder: 'Input placeholder', welcome: 'Welcome message', height: 'Card height', show_header: 'Show header', show_thinking: 'Show thinking', thinking_open: 'Expand thinking by default', working_message: 'Waiting message', show_working_bubbles: 'Show waiting dots', tts_auto: 'Automatically speak replies', tts_entity: 'TTS engine', tts_current_browser: 'Play on this browser', tts_media_player: 'Media player', tts_language: 'Language', tts_voice: 'Voice', tts_cache: 'Cache generated speech', show_speak_buttons: 'Show button', speak_button_text: 'Button text', speak_button_icon: 'Icon', speak_button_mode: 'Display', speak_button_size: 'Size', show_speak_last_button: 'Show button by input', speak_last_button_text: 'Button text', speak_last_button_icon: 'Icon', speak_last_button_mode: 'Display', show_message_copy_button: 'Show button', message_copy_button_text: 'Button text', message_copy_button_icon: 'Icon', message_copy_button_mode: 'Display', message_copy_button_size: 'Size', show_response_copy_button: 'Show button', response_copy_button_text: 'Button text', response_copy_button_icon: 'Icon', response_copy_button_mode: 'Display', response_copy_button_size: 'Size', show_clear_button: 'Show Clear chat', show_remind_button: 'Show Remind agent', show_reset_context_button: 'Show Reset context', show_stop_button: 'Show while waiting', clear_button_text: 'Button text', remind_button_text: 'Button text', reset_context_button_text: 'Button text', stop_button_text: 'Button text', send_button_text: 'Button text', clear_button_icon: 'Icon', remind_button_icon: 'Icon', reset_context_button_icon: 'Icon', stop_button_icon: 'Icon', send_button_icon: 'Icon', clear_button_mode: 'Display', remind_button_mode: 'Display', reset_context_button_mode: 'Display', stop_button_mode: 'Display', send_button_mode: 'Display', remind_prompt: 'Reminder instruction', allow_local_images: 'Allow local images', allow_remote_images: 'Allow remote images', image_url_allowlist: 'Remote URL allowlist', persist_minutes: 'Keep chat for (minutes)', storage_id: 'Storage ID', pipeline_id: 'Assist pipeline (same agent)', pipelines: 'Pipeline per agent', url: 'Endpoint URL', model: 'Model', token: 'Bearer token', stream: 'Stream response', system_prompt: 'System prompt', headers: 'Additional headers', parameters: 'Additional request parameters' })[field.name],
     computeHelper: field => ({ entity: 'Pick the initial conversation agent. Leave blank to use the first available.', agents: 'Leave blank to show all agents.', tts_auto: 'Speaks each new completed assistant reply. A TTS engine and output destination are required.', tts_entity: 'The tts.* provider used by Home Assistant.', tts_current_browser: 'Play audio on the browser displaying this card. When enabled, the media player is ignored.', tts_media_player: 'The media_player.* playback destination used when browser playback is disabled.', tts_language: 'Optional language code supported by the selected TTS engine.', tts_voice: 'Optional provider-specific voice name passed as options.voice.', show_speak_buttons: 'Adds a manual Speak control beneath each completed assistant reply.', show_speak_last_button: 'Adds a manual control immediately left of the message input.', image_url_allowlist: 'Full-URL glob patterns, or regular expressions prefixed with re:. Empty denies remote images.', persist_minutes: '0 disables storage. Existing persist_hours YAML is still accepted.', pipeline_id: 'Choose a pipeline configured for the selected conversation agent.', pipelines: 'Map conversation entity IDs to Assist pipeline IDs (YAML object).', token: 'Stored in the dashboard configuration and sent directly by your browser.', remind_prompt: 'Sent before the transcript when you press Remind agent.' })[field.name],
   };
 }
@@ -113,13 +131,18 @@ export function normalizeConfig(config) {
   if (!Number.isFinite(Number(minutes)) || Number(minutes) < 0){ 
     throw new Error('persist_minutes must be >= 0');
   }
-  for (const name of ['clear_button_mode', 'remind_button_mode', 'reset_context_button_mode', 'stop_button_mode', 'send_button_mode', 'speak_button_mode', 'speak_last_button_mode']) {
+  for (const name of ['clear_button_mode', 'remind_button_mode', 'reset_context_button_mode', 'stop_button_mode', 'send_button_mode', 'speak_button_mode', 'speak_last_button_mode', 'message_copy_button_mode', 'response_copy_button_mode']) {
     if (config[name] != null && !['text', 'icon', 'both'].includes(config[name])) {
       throw new Error(`${name} must be text, icon or both`);
     }
   }
   if (config.speak_button_size != null && !['tiny', 'small', 'medium', 'large'].includes(config.speak_button_size)) {
     throw new Error('speak_button_size must be tiny, small, medium or large');
+  }
+  for (const name of ['message_copy_button_size', 'response_copy_button_size']) {
+    if (config[name] != null && !['tiny', 'small', 'medium', 'large'].includes(config[name])) {
+      throw new Error(`${name} must be tiny, small, medium or large`);
+    }
   }
   const imageAllowlist = config.image_url_allowlist == null ? [] : 
   (Array.isArray(config.image_url_allowlist) ? 

@@ -45,7 +45,17 @@ var DEFAULT_CONFIG = {
 	show_speak_last_button: false,
 	speak_last_button_text: "",
 	speak_last_button_icon: "mdi:volume-high",
-	speak_last_button_mode: "icon"
+	speak_last_button_mode: "icon",
+	show_message_copy_button: false,
+	message_copy_button_text: "Copy to clipboard",
+	message_copy_button_icon: "mdi:content-copy",
+	message_copy_button_mode: "both",
+	message_copy_button_size: "small",
+	show_response_copy_button: false,
+	response_copy_button_text: "Copy to clipboard",
+	response_copy_button_icon: "mdi:content-copy",
+	response_copy_button_mode: "both",
+	response_copy_button_size: "small"
 };
 function getStubConfig() {
 	return {
@@ -70,7 +80,13 @@ function getStubConfig() {
 		stop_button_mode: "text",
 		speak_button_mode: "both",
 		speak_button_size: "small",
-		speak_last_button_mode: "icon"
+		speak_last_button_mode: "icon",
+		show_message_copy_button: false,
+		message_copy_button_mode: "both",
+		message_copy_button_size: "small",
+		show_response_copy_button: false,
+		response_copy_button_mode: "both",
+		response_copy_button_size: "small"
 	};
 }
 function getConfigForm() {
@@ -193,6 +209,20 @@ function getConfigForm() {
 				mode("speak_button_mode"),
 				size("speak_button_size")
 			]),
+			group("message_copy", "Message Copy", [
+				toggle("show_message_copy_button"),
+				text("message_copy_button_text"),
+				icon("message_copy_button_icon"),
+				mode("message_copy_button_mode"),
+				size("message_copy_button_size")
+			]),
+			group("response_copy", "Response Copy", [
+				toggle("show_response_copy_button"),
+				text("response_copy_button_text"),
+				icon("response_copy_button_icon"),
+				mode("response_copy_button_mode"),
+				size("response_copy_button_size")
+			]),
 			group("send_button", "Send button", [
 				text("send_button_text"),
 				icon("send_button_icon"),
@@ -296,6 +326,16 @@ function getConfigForm() {
 			speak_last_button_text: "Button text",
 			speak_last_button_icon: "Icon",
 			speak_last_button_mode: "Display",
+			show_message_copy_button: "Show button",
+			message_copy_button_text: "Button text",
+			message_copy_button_icon: "Icon",
+			message_copy_button_mode: "Display",
+			message_copy_button_size: "Size",
+			show_response_copy_button: "Show button",
+			response_copy_button_text: "Button text",
+			response_copy_button_icon: "Icon",
+			response_copy_button_mode: "Display",
+			response_copy_button_size: "Size",
 			show_clear_button: "Show Clear chat",
 			show_remind_button: "Show Remind agent",
 			show_reset_context_button: "Show Reset context",
@@ -363,7 +403,9 @@ function normalizeConfig(config) {
 		"stop_button_mode",
 		"send_button_mode",
 		"speak_button_mode",
-		"speak_last_button_mode"
+		"speak_last_button_mode",
+		"message_copy_button_mode",
+		"response_copy_button_mode"
 	]) if (config[name] != null && ![
 		"text",
 		"icon",
@@ -375,6 +417,12 @@ function normalizeConfig(config) {
 		"medium",
 		"large"
 	].includes(config.speak_button_size)) throw new Error("speak_button_size must be tiny, small, medium or large");
+	for (const name of ["message_copy_button_size", "response_copy_button_size"]) if (config[name] != null && ![
+		"tiny",
+		"small",
+		"medium",
+		"large"
+	].includes(config[name])) throw new Error(`${name} must be tiny, small, medium or large`);
 	const imageAllowlist = config.image_url_allowlist == null ? [] : (Array.isArray(config.image_url_allowlist) ? config.image_url_allowlist : [config.image_url_allowlist]).map(normalized).filter(Boolean);
 	return {
 		...DEFAULT_CONFIG,
@@ -969,8 +1017,17 @@ var ConversationChatCard = class extends HTMLElement {
 		for (const msg of this._messages) {
 			const bubble = document.createElement("div");
 			bubble.className = `bubble ${msg.role}`;
-			if (msg.role === "user" || msg.role === "error") bubble.textContent = msg.text;
-			else {
+			if (msg.role === "user" || msg.role === "error") {
+				bubble.textContent = msg.text;
+				const isMessage = msg.role === "user";
+				const showCopy = isMessage ? this._cfg.show_message_copy_button : this._cfg.show_response_copy_button;
+				if (msg.text && showCopy === true) {
+					const actions = document.createElement("div");
+					actions.className = "bubble-actions";
+					actions.append(this._copyButton(msg.text, isMessage ? "message" : "response"));
+					bubble.append(actions);
+				}
+			} else {
 				if (msg.thinking && this._cfg.show_thinking !== false) {
 					const details = document.createElement("details");
 					details.open = Boolean(this._cfg.thinking_open);
@@ -1005,14 +1062,17 @@ var ConversationChatCard = class extends HTMLElement {
 					body.innerHTML = this._markdown(msg.text);
 					bubble.append(body);
 				}
-				if (!msg.pending && msg.text && this._cfg.show_speak_buttons === true) {
+				if (!msg.pending && msg.text && (this._cfg.show_speak_buttons === true || this._cfg.show_response_copy_button === true)) {
 					const actions = document.createElement("div");
 					actions.className = "bubble-actions";
-					const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, "Speak response");
-					speak.dataset.size = this._cfg.speak_button_size;
-					speak.disabled = !this._canSpeak();
-					speak.addEventListener("click", () => this._speakReply(msg.text));
-					actions.append(speak);
+					if (this._cfg.show_speak_buttons === true) {
+						const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, "Speak response");
+						speak.dataset.size = this._cfg.speak_button_size;
+						speak.disabled = !this._canSpeak();
+						speak.addEventListener("click", () => this._speakReply(msg.text));
+						actions.append(speak);
+					}
+					if (this._cfg.show_response_copy_button === true) actions.append(this._copyButton(msg.text, "response"));
 					bubble.append(actions);
 				}
 			}
@@ -1022,6 +1082,37 @@ var ConversationChatCard = class extends HTMLElement {
 		if (this._resetContextButton) this._resetContextButton.disabled = this._busy || !this._conversationId;
 		if (this._speakLastButton) this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();
 		this._log.scrollTop = this._log.scrollHeight;
+	}
+	_copyButton(text, type) {
+		const prefix = type === "message" ? "message_copy_button" : "response_copy_button";
+		const copy = button(`copy-${type}`, this._cfg[`${prefix}_text`], this._cfg[`${prefix}_icon`], this._cfg[`${prefix}_mode`], `Copy ${type}`);
+		copy.dataset.size = this._cfg[`${prefix}_size`];
+		copy.addEventListener("click", () => {
+			this._copyText(text);
+		});
+		return copy;
+	}
+	async _copyText(text) {
+		const value = safe(text);
+		if (navigator.clipboard?.writeText) try {
+			await navigator.clipboard.writeText(value);
+			return;
+		} catch {}
+		let field;
+		try {
+			field = document.createElement("textarea");
+			field.value = value;
+			field.setAttribute("readonly", "");
+			field.style.position = "fixed";
+			field.style.opacity = "0";
+			document.body.append(field);
+			field.select();
+			if (!document.execCommand("copy")) throw new Error("The browser rejected the copy command");
+		} catch (error) {
+			console.warn(TAG$1, "Could not copy message", error);
+		} finally {
+			field?.remove();
+		}
 	}
 	_splitThinking(message) {
 		const source = safe(message.raw || message.text);

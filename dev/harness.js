@@ -23,6 +23,16 @@ window.Audio = class AudioMock extends EventTarget {
   }
 };
 
+Object.defineProperty(navigator, 'clipboard', {
+  configurable: true,
+  value: {
+    async writeText(text) {
+      window.__lastCopiedText = text;
+      document.documentElement.dataset.lastCopiedText = text;
+    },
+  },
+});
+
 const entryModule = new URLSearchParams(window.location.search).has('dist')
   ? `../dist/conversation-chat-card.js${window.location.search}`
   : '../src/index.js';
@@ -49,6 +59,8 @@ card.setConfig({
   show_speak_buttons: true,
   speak_button_size: 'tiny',
   show_speak_last_button: true,
+  show_message_copy_button: true,
+  show_response_copy_button: true,
 });
 
 card.hass = {

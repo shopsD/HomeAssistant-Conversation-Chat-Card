@@ -348,6 +348,14 @@ export class ConversationChatCard extends HTMLElement {
         const bubble = document.createElement('div'); bubble.className = `bubble ${msg.role}`;
         if (msg.role === 'user' || msg.role === 'error') {
           bubble.textContent = msg.text;
+          const isMessage = msg.role === 'user';
+          const showCopy = isMessage ? this._cfg.show_message_copy_button : this._cfg.show_response_copy_button;
+          if (msg.text && showCopy === true) {
+            const actions = document.createElement('div');
+            actions.className = 'bubble-actions';
+            actions.append(this._copyButton(msg.text, isMessage ? 'message' : 'response'));
+            bubble.append(actions);
+          }
         }else {
           if (msg.thinking && this._cfg.show_thinking !== false) {
             const details = document.createElement('details'); 
@@ -385,14 +393,19 @@ export class ConversationChatCard extends HTMLElement {
             body.innerHTML = this._markdown(msg.text);
              bubble.append(body);
           }
-          if (!msg.pending && msg.text && this._cfg.show_speak_buttons === true) {
+          if (!msg.pending && msg.text && (this._cfg.show_speak_buttons === true || this._cfg.show_response_copy_button === true)) {
             const actions = document.createElement('div');
             actions.className = 'bubble-actions';
-            const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, 'Speak response');
-            speak.dataset.size = this._cfg.speak_button_size;
-            speak.disabled = !this._canSpeak();
-            speak.addEventListener('click', () => this._speakReply(msg.text));
-            actions.append(speak);
+            if (this._cfg.show_speak_buttons === true) {
+              const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, 'Speak response');
+              speak.dataset.size = this._cfg.speak_button_size;
+              speak.disabled = !this._canSpeak();
+              speak.addEventListener('click', () => this._speakReply(msg.text));
+              actions.append(speak);
+            }
+            if (this._cfg.show_response_copy_button === true) {
+              actions.append(this._copyButton(msg.text, 'response'));
+            }
             bubble.append(actions);
           }
         }
@@ -402,6 +415,39 @@ export class ConversationChatCard extends HTMLElement {
       if (this._resetContextButton) {this._resetContextButton.disabled = this._busy || !this._conversationId;}
       if (this._speakLastButton) {this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();}
       this._log.scrollTop = this._log.scrollHeight;
+    }
+    _copyButton(text, type) {
+      const isMessage = type === 'message';
+      const prefix = isMessage ? 'message_copy_button' : 'response_copy_button';
+      const copy = button(`copy-${type}`, this._cfg[`${prefix}_text`], this._cfg[`${prefix}_icon`], this._cfg[`${prefix}_mode`], `Copy ${type}`);
+      copy.dataset.size = this._cfg[`${prefix}_size`];
+      copy.addEventListener('click', () => { void this._copyText(text); });
+      return copy;
+    }
+    async _copyText(text) {
+      const value = safe(text);
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(value);
+          return;
+        } catch {}
+      }
+      let field;
+      try {
+        field = document.createElement('textarea');
+        field.value = value;
+        field.setAttribute('readonly', '');
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.append(field);
+        field.select();
+        const copied = document.execCommand('copy');
+        if (!copied) { throw new Error('The browser rejected the copy command'); }
+      } catch (error) {
+        console.warn(TAG, 'Could not copy message', error);
+      } finally {
+        field?.remove();
+      }
     }
     _splitThinking(message) {
       const source = safe(message.raw || message.text);

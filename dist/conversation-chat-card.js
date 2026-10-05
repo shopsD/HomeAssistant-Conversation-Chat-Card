@@ -63,6 +63,13 @@ var DEFAULT_CONFIG = {
 	message_copy_button_feedback_icon: "mdi:check",
 	message_copy_button_mode: "both",
 	message_copy_button_size: "small",
+	show_resend_message_button: false,
+	resend_message_button_text: "",
+	resend_message_button_icon: "mdi:refresh",
+	resend_message_button_feedback_text: "Resending",
+	resend_message_button_feedback_icon: "mdi:refresh",
+	resend_message_button_mode: "icon",
+	resend_message_button_size: "small",
 	show_response_copy_button: false,
 	response_copy_button_text: "Copy to clipboard",
 	response_copy_button_icon: "mdi:content-copy",
@@ -100,6 +107,9 @@ function getStubConfig() {
 		show_message_copy_button: false,
 		message_copy_button_mode: "both",
 		message_copy_button_size: "small",
+		show_resend_message_button: false,
+		resend_message_button_mode: "icon",
+		resend_message_button_size: "small",
 		show_response_copy_button: false,
 		response_copy_button_mode: "both",
 		response_copy_button_size: "small"
@@ -238,6 +248,15 @@ function getConfigForm() {
 				mode("message_copy_button_mode"),
 				size("message_copy_button_size")
 			]),
+			group("resend_message", "Resend Message", [
+				toggle("show_resend_message_button"),
+				mode("resend_message_button_mode"),
+				size("resend_message_button_size"),
+				text("resend_message_button_text"),
+				icon("resend_message_button_icon"),
+				text("resend_message_button_feedback_text"),
+				icon("resend_message_button_feedback_icon")
+			]),
 			group("response_copy", "Response Copy", [
 				toggle("show_response_copy_button"),
 				text("response_copy_button_text"),
@@ -369,6 +388,13 @@ function getConfigForm() {
 			message_copy_button_feedback_icon: "Feedback icon",
 			message_copy_button_mode: "Display",
 			message_copy_button_size: "Size",
+			show_resend_message_button: "Show button",
+			resend_message_button_mode: "Button display",
+			resend_message_button_size: "Size",
+			resend_message_button_text: "Button text",
+			resend_message_button_icon: "Icon",
+			resend_message_button_feedback_text: "Feedback text",
+			resend_message_button_feedback_icon: "Feedback icon",
 			show_response_copy_button: "Show button",
 			response_copy_button_text: "Button text",
 			response_copy_button_icon: "Icon",
@@ -452,6 +478,7 @@ function normalizeConfig(config) {
 		"speak_button_mode",
 		"speak_last_button_mode",
 		"message_copy_button_mode",
+		"resend_message_button_mode",
 		"response_copy_button_mode"
 	]) if (config[name] != null && ![
 		"text",
@@ -464,7 +491,11 @@ function normalizeConfig(config) {
 		"medium",
 		"large"
 	].includes(config.speak_button_size)) throw new Error("speak_button_size must be tiny, small, medium or large");
-	for (const name of ["message_copy_button_size", "response_copy_button_size"]) if (config[name] != null && ![
+	for (const name of [
+		"message_copy_button_size",
+		"resend_message_button_size",
+		"response_copy_button_size"
+	]) if (config[name] != null && ![
 		"tiny",
 		"small",
 		"medium",
@@ -1103,6 +1134,8 @@ var ConversationChatCard = class extends HTMLElement {
 			hint.textContent = safe(this._cfg.welcome || "Start a conversation");
 			this._log.append(hint);
 		}
+		const resendableMessage = this._lastResendableMessage();
+		const hasPendingMessage = this._messages.some((message) => message.pending);
 		for (const msg of this._messages) {
 			const bubble = document.createElement("div");
 			bubble.className = `bubble ${msg.role}`;
@@ -1110,10 +1143,12 @@ var ConversationChatCard = class extends HTMLElement {
 				bubble.textContent = msg.text;
 				const isMessage = msg.role === "user";
 				const showCopy = isMessage ? this._cfg.show_message_copy_button : this._cfg.show_response_copy_button;
-				if (msg.text && showCopy === true) {
+				const showResend = isMessage && msg === resendableMessage && this._cfg.show_resend_message_button === true && (!hasPendingMessage || msg.resending);
+				if (msg.text && (showCopy === true || showResend)) {
 					const actions = document.createElement("div");
 					actions.className = "bubble-actions";
-					actions.append(this._copyButton(msg.text, isMessage ? "message" : "response"));
+					if (showCopy === true) actions.append(this._copyButton(msg.text, isMessage ? "message" : "response"));
+					if (showResend) actions.append(this._resendButton(msg));
 					bubble.append(actions);
 				}
 			} else {
@@ -1183,6 +1218,17 @@ var ConversationChatCard = class extends HTMLElement {
 			if (await this._copyText(text)) showButtonFeedback(copy, this._cfg[`${prefix}_feedback_text`], this._cfg[`${prefix}_feedback_icon`], `Copied ${type}`);
 		});
 		return copy;
+	}
+	_resendButton(message) {
+		const feedback = message.resending === true;
+		const resend = button("resend-message", feedback ? this._cfg.resend_message_button_feedback_text : this._cfg.resend_message_button_text, feedback ? this._cfg.resend_message_button_feedback_icon : this._cfg.resend_message_button_icon, this._cfg.resend_message_button_mode, feedback ? "Resending message" : "Resend message");
+		resend.dataset.size = this._cfg.resend_message_button_size;
+		resend.disabled = feedback;
+		if (feedback) resend.dataset.feedback = "true";
+		else resend.addEventListener("click", () => {
+			this._resendMessage(message);
+		});
+		return resend;
 	}
 	async _copyText(text) {
 		const value = safe(text);
@@ -1257,6 +1303,29 @@ var ConversationChatCard = class extends HTMLElement {
 		};
 		return messages.map((msg) => `${labels[msg.role]}: ${msg.text}`).join("\n\n");
 	}
+	_lastResendableMessage() {
+		for (let index = this._messages.length - 1; index >= 0; index--) {
+			const message = this._messages[index];
+			if (message.role === "user" && !message.reminder && normalized(message.text)) return message;
+		}
+		return null;
+	}
+	async _resendMessage(message) {
+		if (this._busy || !this._hass) return;
+		this._expireBeforeSend();
+		if (message !== this._lastResendableMessage()) return;
+		const index = this._messages.indexOf(message);
+		if (index < 0) return;
+		this._messages.splice(index + 1);
+		message.resending = true;
+		try {
+			await this._send(message.text, false, message);
+		} finally {
+			delete message.resending;
+			this._render();
+			this._save();
+		}
+	}
 	async _copyConversation() {
 		if (this._busy) return;
 		const messages = this._transcriptMessages(true);
@@ -1272,17 +1341,18 @@ var ConversationChatCard = class extends HTMLElement {
 		const transcript = this._formatTranscript(messages);
 		return this._send(`${prompt}\n\n${transcript}`, true);
 	}
-	async _send(overrideText, reminder = false) {
+	async _send(overrideText, reminder = false, existingMessage = null) {
 		if (this._busy || !this._hass) return;
 		const text = normalized(overrideText === void 0 ? this._input.value : overrideText);
 		if (!text) return;
 		this._expireBeforeSend();
+		if (existingMessage && !this._messages.includes(existingMessage)) return;
 		if (this._cfg.backend === "home_assistant" && !this._agent) {
 			this._showError("No conversation agent is available");
 			return;
 		}
-		if (!reminder) this._input.value = "";
-		this._messages.push({
+		if (!reminder && !existingMessage) this._input.value = "";
+		if (!existingMessage) this._messages.push({
 			role: "user",
 			text: reminder ? safe(this._cfg.remind_button_text) : text,
 			reminder

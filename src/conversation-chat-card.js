@@ -378,16 +378,24 @@ export class ConversationChatCard extends HTMLElement {
         hint.textContent = safe(this._cfg.welcome || 'Start a conversation');
         this._log.append(hint);
       }
+      const resendableMessage = this._lastResendableMessage();
+      const hasPendingMessage = this._messages.some(message => message.pending);
       for (const msg of this._messages) {
         const bubble = document.createElement('div'); bubble.className = `bubble ${msg.role}`;
         if (msg.role === 'user' || msg.role === 'error') {
           bubble.textContent = msg.text;
           const isMessage = msg.role === 'user';
           const showCopy = isMessage ? this._cfg.show_message_copy_button : this._cfg.show_response_copy_button;
-          if (msg.text && showCopy === true) {
+          const showResend = isMessage && msg === resendableMessage && this._cfg.show_resend_message_button === true && (!hasPendingMessage || msg.resending);
+          if (msg.text && (showCopy === true || showResend)) {
             const actions = document.createElement('div');
             actions.className = 'bubble-actions';
-            actions.append(this._copyButton(msg.text, isMessage ? 'message' : 'response'));
+            if (showCopy === true) {
+              actions.append(this._copyButton(msg.text, isMessage ? 'message' : 'response'));
+            }
+            if (showResend) {
+              actions.append(this._resendButton(msg));
+            }
             bubble.append(actions);
           }
         }else {
@@ -467,6 +475,18 @@ export class ConversationChatCard extends HTMLElement {
       });
       return copy;
     }
+    _resendButton(message) {
+      const feedback = message.resending === true;
+      const resend = button('resend-message', feedback ? this._cfg.resend_message_button_feedback_text : this._cfg.resend_message_button_text, feedback ? this._cfg.resend_message_button_feedback_icon : this._cfg.resend_message_button_icon, this._cfg.resend_message_button_mode, feedback ? 'Resending message' : 'Resend message');
+      resend.dataset.size = this._cfg.resend_message_button_size;
+      resend.disabled = feedback;
+      if (feedback) {
+        resend.dataset.feedback = 'true';
+      } else {
+        resend.addEventListener('click', () => { void this._resendMessage(message); });
+      }
+      return resend;
+    }
     async _copyText(text) {
       const value = safe(text);
       if (navigator.clipboard?.writeText) {
@@ -532,6 +552,31 @@ export class ConversationChatCard extends HTMLElement {
       const labels = { user: 'User', assistant: 'Assistant', error: 'Error' };
       return messages.map(msg => `${labels[msg.role]}: ${msg.text}`).join('\n\n');
     }
+    _lastResendableMessage() {
+      for (let index = this._messages.length - 1; index >= 0; index--) {
+        const message = this._messages[index];
+        if (message.role === 'user' && !message.reminder && normalized(message.text)) {
+          return message;
+        }
+      }
+      return null;
+    }
+    async _resendMessage(message) {
+      if (this._busy || !this._hass) { return; }
+      this._expireBeforeSend();
+      if (message !== this._lastResendableMessage()) { return; }
+      const index = this._messages.indexOf(message);
+      if (index < 0) { return; }
+      this._messages.splice(index + 1);
+      message.resending = true;
+      try {
+        await this._send(message.text, false, message);
+      } finally {
+        delete message.resending;
+        this._render();
+        this._save();
+      }
+    }
     async _copyConversation() {
       if (this._busy) { return; }
       const messages = this._transcriptMessages(true);
@@ -549,17 +594,20 @@ export class ConversationChatCard extends HTMLElement {
       const transcript = this._formatTranscript(messages);
       return this._send(`${prompt}\n\n${transcript}`, true);
     }
-    async _send(overrideText, reminder = false) {
+    async _send(overrideText, reminder = false, existingMessage = null) {
       if (this._busy || !this._hass) { return; }
       const text = normalized(overrideText === undefined ? this._input.value : overrideText);
       if (!text) { return; }
       this._expireBeforeSend();
+      if (existingMessage && !this._messages.includes(existingMessage)) { return; }
       if (this._cfg.backend === 'home_assistant' && !this._agent) { 
         this._showError('No conversation agent is available'); 
         return; 
       }
-      if (!reminder) {this._input.value = '';}
-      this._messages.push({ role: 'user', text: reminder ? safe(this._cfg.remind_button_text) : text, reminder });
+      if (!reminder && !existingMessage) {this._input.value = '';}
+      if (!existingMessage) {
+        this._messages.push({ role: 'user', text: reminder ? safe(this._cfg.remind_button_text) : text, reminder });
+      }
       const reply = { role: 'assistant', text: '', thinking: '', pending: true };
       this._messages.push(reply); 
       this._render(); 

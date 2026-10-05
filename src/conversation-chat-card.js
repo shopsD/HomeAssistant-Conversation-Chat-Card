@@ -11,11 +11,11 @@ const TAG = 'conversation-chat-card';
 const moduleUrl = new URL(import.meta.url);
 const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), moduleUrl);
 stylesheetUrl.search = moduleUrl.search;
-const button = (className, label, icon, mode) => {
+const button = (className, label, icon, mode, ariaLabel = label) => {
   const el = document.createElement('button'); 
   el.type = 'button';
   el.className = className;
-  el.setAttribute('aria-label', safe(label));
+  el.setAttribute('aria-label', safe(ariaLabel));
   
   if (mode === 'icon' || mode === 'both') {
     const glyph = document.createElement('ha-icon'); 
@@ -23,7 +23,7 @@ const button = (className, label, icon, mode) => {
     glyph.setAttribute('aria-hidden', 'true'); 
     el.append(glyph);
   }
-  if (mode !== 'icon') {
+  if (mode !== 'icon' && safe(label)) {
     const span = document.createElement('span'); 
     span.textContent = safe(label); 
     el.append(span); 
@@ -157,7 +157,7 @@ export class ConversationChatCard extends HTMLElement {
       const send = button('send', this._cfg.send_button_text, this._cfg.send_button_icon, this._cfg.send_button_mode);
       send.addEventListener('click', () => this._send()); 
       this._sendButton = send;
-      this._speakLastButton = this._cfg.show_speak_last_button === true ? button('speak-last', this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode) : null;
+      this._speakLastButton = this._cfg.show_speak_last_button === true ? button('speak-last', this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode, 'Speak last response') : null;
       if (this._speakLastButton) {
         this._speakLastButton.addEventListener('click', () => this._speakLastReply());
         foot.append(this._speakLastButton);
@@ -388,7 +388,7 @@ export class ConversationChatCard extends HTMLElement {
           if (!msg.pending && msg.text && this._cfg.show_speak_buttons === true) {
             const actions = document.createElement('div');
             actions.className = 'bubble-actions';
-            const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode);
+            const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, 'Speak response');
             speak.dataset.size = this._cfg.speak_button_size;
             speak.disabled = !this._canSpeak();
             speak.addEventListener('click', () => this._speakReply(msg.text));

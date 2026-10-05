@@ -389,6 +389,7 @@ export class ConversationChatCard extends HTMLElement {
             const actions = document.createElement('div');
             actions.className = 'bubble-actions';
             const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode);
+            speak.dataset.size = this._cfg.speak_button_size;
             speak.disabled = !this._canSpeak();
             speak.addEventListener('click', () => this._speakReply(msg.text));
             actions.append(speak);

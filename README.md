@@ -108,7 +108,7 @@ Markdown is converted to plain text before speech. Welcome messages, thinking, s
 
 Browser playback uses the Home Assistant TTS engine to generate audio, then plays that audio locally in the dashboard. Browser autoplay policies can block automatic speech until the user has interacted with the page. Manual Speak controls originate from a user click and are generally more reliable. Starting another browser playback stops the card's previous local playback.
 
-Message Copy and Response Copy controls can be enabled independently in the visual editor. The message control copies user messages, while the response control copies completed assistant responses and errors. Each has its own label, icon, display mode, and size. Copying preserves the original plain text or Markdown source.
+Message Copy and Response Copy controls can be enabled independently in the visual editor. The message control copies user messages, while the response control copies completed assistant responses and errors. Each has its own label, icon, feedback label, feedback icon, display mode, and size. Copying preserves the original plain text or Markdown source. After a successful copy, the configured feedback content appears for 1.5 seconds. Manual TTS controls provide the same brief feedback after playback starts.
 
 ## Conversation storage
 
@@ -226,15 +226,19 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `tts_voice` | None | Optional provider-specific voice name passed as `options.voice`. |
 | `tts_cache` | `true` | Allow Home Assistant to cache generated speech. |
 | `show_speak_buttons` | `false` | Show a Speak control beneath completed assistant replies. |
-| `speak_button_text`, `speak_button_icon`, `speak_button_mode` | `Speak`, `mdi:volume-high`, `both` | Per-response content. Use `text`, `icon`, or `both`. |
+| `speak_button_text`, `speak_button_icon`, `speak_button_mode` | Empty, `mdi:volume-high`, `both` | Per-response content. Use `text`, `icon`, or `both`. |
+| `speak_button_feedback_text`, `speak_button_feedback_icon` | `Speaking`, `mdi:check` | Brief per-response feedback after speech starts. |
 | `speak_button_size` | `small` | Per-response control size: `tiny`, `small`, `medium`, or `large`. |
 | `show_speak_last_button` | `false` | Show a Speak last response control left of the message input. |
-| `speak_last_button_text`, `speak_last_button_icon`, `speak_last_button_mode` | `Speak last response`, `mdi:volume-high`, `icon` | Footer Speak button display. |
+| `speak_last_button_text`, `speak_last_button_icon`, `speak_last_button_mode` | Empty, `mdi:volume-high`, `icon` | Footer Speak button display. |
+| `speak_last_button_feedback_text`, `speak_last_button_feedback_icon` | `Speaking`, `mdi:check` | Brief footer feedback after speech starts. |
 | `show_message_copy_button` | `false` | Show a Copy control beneath user messages. |
 | `message_copy_button_text`, `message_copy_button_icon`, `message_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | User-message Copy button display. |
+| `message_copy_button_feedback_text`, `message_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful user-message copy. |
 | `message_copy_button_size` | `small` | User-message Copy control size: `tiny`, `small`, `medium`, or `large`. |
 | `show_response_copy_button` | `false` | Show a Copy control beneath assistant responses and errors. |
 | `response_copy_button_text`, `response_copy_button_icon`, `response_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | Response/error Copy button display. |
+| `response_copy_button_feedback_text`, `response_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful response/error copy. |
 | `response_copy_button_size` | `small` | Response/error Copy control size: `tiny`, `small`, `medium`, or `large`. |
 | `show_stop_button` | `true` | Show Stop while a request is pending. |
 | `stop_button_text`, `stop_button_icon`, `stop_button_mode` | `Stop`, `mdi:stop`, `text` | Stop button display. |

@@ -40,20 +40,28 @@ var DEFAULT_CONFIG = {
 	show_speak_buttons: false,
 	speak_button_text: "",
 	speak_button_icon: "mdi:volume-high",
+	speak_button_feedback_text: "Speaking",
+	speak_button_feedback_icon: "mdi:check",
 	speak_button_mode: "both",
 	speak_button_size: "small",
 	show_speak_last_button: false,
 	speak_last_button_text: "",
 	speak_last_button_icon: "mdi:volume-high",
+	speak_last_button_feedback_text: "Speaking",
+	speak_last_button_feedback_icon: "mdi:check",
 	speak_last_button_mode: "icon",
 	show_message_copy_button: false,
 	message_copy_button_text: "Copy to clipboard",
 	message_copy_button_icon: "mdi:content-copy",
+	message_copy_button_feedback_text: "Copied",
+	message_copy_button_feedback_icon: "mdi:check",
 	message_copy_button_mode: "both",
 	message_copy_button_size: "small",
 	show_response_copy_button: false,
 	response_copy_button_text: "Copy to clipboard",
 	response_copy_button_icon: "mdi:content-copy",
+	response_copy_button_feedback_text: "Copied",
+	response_copy_button_feedback_icon: "mdi:check",
 	response_copy_button_mode: "both",
 	response_copy_button_size: "small"
 };
@@ -200,12 +208,16 @@ function getConfigForm() {
 				toggle("show_speak_last_button"),
 				text("speak_last_button_text"),
 				icon("speak_last_button_icon"),
+				text("speak_last_button_feedback_text"),
+				icon("speak_last_button_feedback_icon"),
 				mode("speak_last_button_mode")
 			]),
 			group("response_tts", "Response TTS", [
 				toggle("show_speak_buttons"),
 				text("speak_button_text"),
 				icon("speak_button_icon"),
+				text("speak_button_feedback_text"),
+				icon("speak_button_feedback_icon"),
 				mode("speak_button_mode"),
 				size("speak_button_size")
 			]),
@@ -213,6 +225,8 @@ function getConfigForm() {
 				toggle("show_message_copy_button"),
 				text("message_copy_button_text"),
 				icon("message_copy_button_icon"),
+				text("message_copy_button_feedback_text"),
+				icon("message_copy_button_feedback_icon"),
 				mode("message_copy_button_mode"),
 				size("message_copy_button_size")
 			]),
@@ -220,6 +234,8 @@ function getConfigForm() {
 				toggle("show_response_copy_button"),
 				text("response_copy_button_text"),
 				icon("response_copy_button_icon"),
+				text("response_copy_button_feedback_text"),
+				icon("response_copy_button_feedback_icon"),
 				mode("response_copy_button_mode"),
 				size("response_copy_button_size")
 			]),
@@ -320,20 +336,28 @@ function getConfigForm() {
 			show_speak_buttons: "Show button",
 			speak_button_text: "Button text",
 			speak_button_icon: "Icon",
+			speak_button_feedback_text: "Feedback text",
+			speak_button_feedback_icon: "Feedback icon",
 			speak_button_mode: "Display",
 			speak_button_size: "Size",
 			show_speak_last_button: "Show button by input",
 			speak_last_button_text: "Button text",
 			speak_last_button_icon: "Icon",
+			speak_last_button_feedback_text: "Feedback text",
+			speak_last_button_feedback_icon: "Feedback icon",
 			speak_last_button_mode: "Display",
 			show_message_copy_button: "Show button",
 			message_copy_button_text: "Button text",
 			message_copy_button_icon: "Icon",
+			message_copy_button_feedback_text: "Feedback text",
+			message_copy_button_feedback_icon: "Feedback icon",
 			message_copy_button_mode: "Display",
 			message_copy_button_size: "Size",
 			show_response_copy_button: "Show button",
 			response_copy_button_text: "Button text",
 			response_copy_button_icon: "Icon",
+			response_copy_button_feedback_text: "Feedback text",
+			response_copy_button_feedback_icon: "Feedback icon",
 			response_copy_button_mode: "Display",
 			response_copy_button_size: "Size",
 			show_clear_button: "Show Clear chat",
@@ -694,23 +718,54 @@ var TAG$1 = "conversation-chat-card";
 var moduleUrl = new URL(import.meta.url);
 var stylesheetUrl = new URL(conversation_chat_card_default.split("/").pop(), moduleUrl);
 stylesheetUrl.search = moduleUrl.search;
+var BUTTON_FEEDBACK_MS = 1500;
+var buttonContent = /* @__PURE__ */ new WeakMap();
+var buttonFeedbackTimers = /* @__PURE__ */ new WeakMap();
+var renderButtonContent = (el, content) => {
+	el.replaceChildren();
+	el.setAttribute("aria-label", safe(content.ariaLabel));
+	if (content.mode === "icon" || content.mode === "both") {
+		const glyph = document.createElement("ha-icon");
+		glyph.setAttribute("icon", safe(content.icon));
+		glyph.setAttribute("aria-hidden", "true");
+		el.append(glyph);
+	}
+	if (content.mode !== "icon" && safe(content.label)) {
+		const span = document.createElement("span");
+		span.textContent = safe(content.label);
+		el.append(span);
+	}
+};
 var button = (className, label, icon, mode, ariaLabel = label) => {
 	const el = document.createElement("button");
 	el.type = "button";
 	el.className = className;
-	el.setAttribute("aria-label", safe(ariaLabel));
-	if (mode === "icon" || mode === "both") {
-		const glyph = document.createElement("ha-icon");
-		glyph.setAttribute("icon", safe(icon));
-		glyph.setAttribute("aria-hidden", "true");
-		el.append(glyph);
-	}
-	if (mode !== "icon" && safe(label)) {
-		const span = document.createElement("span");
-		span.textContent = safe(label);
-		el.append(span);
-	}
+	const content = {
+		label,
+		icon,
+		mode,
+		ariaLabel
+	};
+	buttonContent.set(el, content);
+	renderButtonContent(el, content);
 	return el;
+};
+var showButtonFeedback = (el, label, icon, ariaLabel) => {
+	const original = buttonContent.get(el);
+	if (!original) return;
+	clearTimeout(buttonFeedbackTimers.get(el));
+	renderButtonContent(el, {
+		label,
+		icon,
+		mode: original.mode,
+		ariaLabel
+	});
+	el.dataset.feedback = "true";
+	buttonFeedbackTimers.set(el, setTimeout(() => {
+		renderButtonContent(el, original);
+		delete el.dataset.feedback;
+		buttonFeedbackTimers.delete(el);
+	}, BUTTON_FEEDBACK_MS));
 };
 var ConversationChatCard = class extends HTMLElement {
 	static getStubConfig() {
@@ -827,7 +882,9 @@ var ConversationChatCard = class extends HTMLElement {
 		this._sendButton = send;
 		this._speakLastButton = this._cfg.show_speak_last_button === true ? button("speak-last", this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode, "Speak last response") : null;
 		if (this._speakLastButton) {
-			this._speakLastButton.addEventListener("click", () => this._speakLastReply());
+			this._speakLastButton.addEventListener("click", async () => {
+				if (await this._speakLastReply()) showButtonFeedback(this._speakLastButton, this._cfg.speak_last_button_feedback_text, this._cfg.speak_last_button_feedback_icon, "Speaking last response");
+			});
 			foot.append(this._speakLastButton);
 		}
 		foot.append(this._input);
@@ -1069,7 +1126,9 @@ var ConversationChatCard = class extends HTMLElement {
 						const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, "Speak response");
 						speak.dataset.size = this._cfg.speak_button_size;
 						speak.disabled = !this._canSpeak();
-						speak.addEventListener("click", () => this._speakReply(msg.text));
+						speak.addEventListener("click", async () => {
+							if (await this._speakReply(msg.text)) showButtonFeedback(speak, this._cfg.speak_button_feedback_text, this._cfg.speak_button_feedback_icon, "Speaking response");
+						});
 						actions.append(speak);
 					}
 					if (this._cfg.show_response_copy_button === true) actions.append(this._copyButton(msg.text, "response"));
@@ -1087,8 +1146,8 @@ var ConversationChatCard = class extends HTMLElement {
 		const prefix = type === "message" ? "message_copy_button" : "response_copy_button";
 		const copy = button(`copy-${type}`, this._cfg[`${prefix}_text`], this._cfg[`${prefix}_icon`], this._cfg[`${prefix}_mode`], `Copy ${type}`);
 		copy.dataset.size = this._cfg[`${prefix}_size`];
-		copy.addEventListener("click", () => {
-			this._copyText(text);
+		copy.addEventListener("click", async () => {
+			if (await this._copyText(text)) showButtonFeedback(copy, this._cfg[`${prefix}_feedback_text`], this._cfg[`${prefix}_feedback_icon`], `Copied ${type}`);
 		});
 		return copy;
 	}
@@ -1096,7 +1155,7 @@ var ConversationChatCard = class extends HTMLElement {
 		const value = safe(text);
 		if (navigator.clipboard?.writeText) try {
 			await navigator.clipboard.writeText(value);
-			return;
+			return true;
 		} catch {}
 		let field;
 		try {
@@ -1108,8 +1167,10 @@ var ConversationChatCard = class extends HTMLElement {
 			document.body.append(field);
 			field.select();
 			if (!document.execCommand("copy")) throw new Error("The browser rejected the copy command");
+			return true;
 		} catch (error) {
 			console.warn(TAG$1, "Could not copy message", error);
+			return false;
 		} finally {
 			field?.remove();
 		}
@@ -1225,8 +1286,10 @@ var ConversationChatCard = class extends HTMLElement {
 		for (const block of content.querySelectorAll("p, li, blockquote, pre, h1, h2, h3, h4, h5, h6")) block.append(" ");
 		try {
 			await speakText(this._hass, this._cfg, content.textContent, (source) => this._playBrowserAudio(source));
+			return true;
 		} catch (error) {
 			console.warn(TAG$1, "Could not speak assistant reply", error);
+			return false;
 		}
 	}
 	_canSpeak() {
@@ -1248,9 +1311,10 @@ var ConversationChatCard = class extends HTMLElement {
 		}
 		return null;
 	}
-	_speakLastReply() {
+	async _speakLastReply() {
 		const message = this._lastSpeakableMessage();
-		if (message) this._speakReply(message.text);
+		if (message) return this._speakReply(message.text);
+		return false;
 	}
 	_pipelineForAgent() {
 		return pipelineForAgent(this._cfg, this._agent);

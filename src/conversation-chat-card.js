@@ -11,24 +11,44 @@ const TAG = 'conversation-chat-card';
 const moduleUrl = new URL(import.meta.url);
 const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), moduleUrl);
 stylesheetUrl.search = moduleUrl.search;
+const BUTTON_FEEDBACK_MS = 1500;
+const buttonContent = new WeakMap();
+const buttonFeedbackTimers = new WeakMap();
+const renderButtonContent = (el, content) => {
+  el.replaceChildren();
+  el.setAttribute('aria-label', safe(content.ariaLabel));
+  if (content.mode === 'icon' || content.mode === 'both') {
+    const glyph = document.createElement('ha-icon');
+    glyph.setAttribute('icon', safe(content.icon));
+    glyph.setAttribute('aria-hidden', 'true');
+    el.append(glyph);
+  }
+  if (content.mode !== 'icon' && safe(content.label)) {
+    const span = document.createElement('span');
+    span.textContent = safe(content.label);
+    el.append(span);
+  }
+};
 const button = (className, label, icon, mode, ariaLabel = label) => {
   const el = document.createElement('button'); 
   el.type = 'button';
   el.className = className;
-  el.setAttribute('aria-label', safe(ariaLabel));
-  
-  if (mode === 'icon' || mode === 'both') {
-    const glyph = document.createElement('ha-icon'); 
-    glyph.setAttribute('icon', safe(icon)); 
-    glyph.setAttribute('aria-hidden', 'true'); 
-    el.append(glyph);
-  }
-  if (mode !== 'icon' && safe(label)) {
-    const span = document.createElement('span'); 
-    span.textContent = safe(label); 
-    el.append(span); 
-  }
+  const content = { label, icon, mode, ariaLabel };
+  buttonContent.set(el, content);
+  renderButtonContent(el, content);
   return el;
+};
+const showButtonFeedback = (el, label, icon, ariaLabel) => {
+  const original = buttonContent.get(el);
+  if (!original) { return; }
+  clearTimeout(buttonFeedbackTimers.get(el));
+  renderButtonContent(el, { label, icon, mode: original.mode, ariaLabel });
+  el.dataset.feedback = 'true';
+  buttonFeedbackTimers.set(el, setTimeout(() => {
+    renderButtonContent(el, original);
+    delete el.dataset.feedback;
+    buttonFeedbackTimers.delete(el);
+  }, BUTTON_FEEDBACK_MS));
 };
 
 export class ConversationChatCard extends HTMLElement {
@@ -159,7 +179,11 @@ export class ConversationChatCard extends HTMLElement {
       this._sendButton = send;
       this._speakLastButton = this._cfg.show_speak_last_button === true ? button('speak-last', this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode, 'Speak last response') : null;
       if (this._speakLastButton) {
-        this._speakLastButton.addEventListener('click', () => this._speakLastReply());
+        this._speakLastButton.addEventListener('click', async () => {
+          if (await this._speakLastReply()) {
+            showButtonFeedback(this._speakLastButton, this._cfg.speak_last_button_feedback_text, this._cfg.speak_last_button_feedback_icon, 'Speaking last response');
+          }
+        });
         foot.append(this._speakLastButton);
       }
       foot.append(this._input); 
@@ -400,7 +424,11 @@ export class ConversationChatCard extends HTMLElement {
               const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, 'Speak response');
               speak.dataset.size = this._cfg.speak_button_size;
               speak.disabled = !this._canSpeak();
-              speak.addEventListener('click', () => this._speakReply(msg.text));
+              speak.addEventListener('click', async () => {
+                if (await this._speakReply(msg.text)) {
+                  showButtonFeedback(speak, this._cfg.speak_button_feedback_text, this._cfg.speak_button_feedback_icon, 'Speaking response');
+                }
+              });
               actions.append(speak);
             }
             if (this._cfg.show_response_copy_button === true) {
@@ -421,7 +449,11 @@ export class ConversationChatCard extends HTMLElement {
       const prefix = isMessage ? 'message_copy_button' : 'response_copy_button';
       const copy = button(`copy-${type}`, this._cfg[`${prefix}_text`], this._cfg[`${prefix}_icon`], this._cfg[`${prefix}_mode`], `Copy ${type}`);
       copy.dataset.size = this._cfg[`${prefix}_size`];
-      copy.addEventListener('click', () => { void this._copyText(text); });
+      copy.addEventListener('click', async () => {
+        if (await this._copyText(text)) {
+          showButtonFeedback(copy, this._cfg[`${prefix}_feedback_text`], this._cfg[`${prefix}_feedback_icon`], `Copied ${type}`);
+        }
+      });
       return copy;
     }
     async _copyText(text) {
@@ -429,7 +461,7 @@ export class ConversationChatCard extends HTMLElement {
       if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(value);
-          return;
+          return true;
         } catch {}
       }
       let field;
@@ -443,8 +475,10 @@ export class ConversationChatCard extends HTMLElement {
         field.select();
         const copied = document.execCommand('copy');
         if (!copied) { throw new Error('The browser rejected the copy command'); }
+        return true;
       } catch (error) {
         console.warn(TAG, 'Could not copy message', error);
+        return false;
       } finally {
         field?.remove();
       }
@@ -553,8 +587,10 @@ export class ConversationChatCard extends HTMLElement {
       }
       try {
         await speakText(this._hass, this._cfg, content.textContent, source => this._playBrowserAudio(source));
+        return true;
       } catch (error) {
         console.warn(TAG, 'Could not speak assistant reply', error);
+        return false;
       }
     }
     _canSpeak() {
@@ -582,11 +618,12 @@ export class ConversationChatCard extends HTMLElement {
       }
       return null;
     }
-    _speakLastReply() {
+    async _speakLastReply() {
       const message = this._lastSpeakableMessage();
       if (message) {
-        void this._speakReply(message.text);
+        return this._speakReply(message.text);
       }
+      return false;
     }
     _pipelineForAgent() {
       return pipelineForAgent(this._cfg, this._agent);

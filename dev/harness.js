@@ -23,6 +23,16 @@ window.Audio = class AudioMock extends EventTarget {
   }
 };
 
+Object.defineProperty(navigator, 'clipboard', {
+  configurable: true,
+  value: {
+    async writeText(text) {
+      window.__lastCopiedText = text;
+      document.documentElement.dataset.lastCopiedText = text;
+    },
+  },
+});
+
 const entryModule = new URLSearchParams(window.location.search).has('dist')
   ? `../dist/conversation-chat-card.js${window.location.search}`
   : '../src/index.js';
@@ -40,6 +50,7 @@ card.setConfig({
   welcome: 'This card is running from the local npm development server.',
   show_thinking: true,
   show_clear_button: true,
+  show_remind_button: true,
   show_stop_button: true,
   tts_auto: true,
   tts_entity: 'tts.mock_voice',
@@ -49,6 +60,9 @@ card.setConfig({
   show_speak_buttons: true,
   speak_button_size: 'tiny',
   show_speak_last_button: true,
+  show_message_copy_button: true,
+  show_response_copy_button: true,
+  show_copy_conversation_button: true,
 });
 
 card.hass = {

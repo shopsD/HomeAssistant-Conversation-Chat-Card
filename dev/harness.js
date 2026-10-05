@@ -61,6 +61,7 @@ card.setConfig({
   speak_button_size: 'tiny',
   show_speak_last_button: true,
   show_message_copy_button: true,
+  show_resend_message_button: true,
   show_response_copy_button: true,
   show_copy_conversation_button: true,
 });

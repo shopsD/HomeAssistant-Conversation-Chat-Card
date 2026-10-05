@@ -95,6 +95,7 @@ speak_button_mode: both
 speak_button_size: small
 show_speak_last_button: true
 show_message_copy_button: true
+show_resend_message_button: true
 show_response_copy_button: true
 show_copy_conversation_button: true
 ```
@@ -112,6 +113,8 @@ Browser playback uses the Home Assistant TTS engine to generate audio, then play
 Message Copy and Response Copy controls can be enabled independently in the visual editor. The message control copies user messages, while the response control copies completed assistant responses and errors. Each has its own label, icon, feedback label, feedback icon, display mode, and size. Copying preserves the original plain text or Markdown source. After a successful copy, the configured feedback content appears for 1.5 seconds. Manual TTS controls provide the same brief feedback after playback starts.
 
 Copy Conversation adds a configurable header control that copies the visible transcript as labelled `User`, `Assistant`, and `Error` blocks. Pending responses, internal reminder messages, thinking content, and the welcome message are excluded. Remind Agent shares the same transcript selection and formatting, but continues to exclude errors.
+
+Resend Message adds a configurable control beside Message Copy on only the most recent user message. It permanently removes everything displayed after that message, keeps the user message visible once, and submits it again. This is a UI-level retry: Home Assistant's existing conversation context is retained and may still contain the removed response.
 
 ## Conversation storage
 
@@ -239,6 +242,10 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `message_copy_button_text`, `message_copy_button_icon`, `message_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | User-message Copy button display. |
 | `message_copy_button_feedback_text`, `message_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful user-message copy. |
 | `message_copy_button_size` | `small` | User-message Copy control size: `tiny`, `small`, `medium`, or `large`. |
+| `show_resend_message_button` | `false` | Show Resend beside Message Copy on the most recent user message. |
+| `resend_message_button_text`, `resend_message_button_icon`, `resend_message_button_mode` | Empty, `mdi:refresh`, `icon` | Resend Message button display. Use `text`, `icon`, or `both`. |
+| `resend_message_button_feedback_text`, `resend_message_button_feedback_icon` | `Resending`, `mdi:refresh` | Content displayed while the replacement response is pending. |
+| `resend_message_button_size` | `small` | Resend Message control size: `tiny`, `small`, `medium`, or `large`. |
 | `show_response_copy_button` | `false` | Show a Copy control beneath assistant responses and errors. |
 | `response_copy_button_text`, `response_copy_button_icon`, `response_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | Response/error Copy button display. |
 | `response_copy_button_feedback_text`, `response_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful response/error copy. |

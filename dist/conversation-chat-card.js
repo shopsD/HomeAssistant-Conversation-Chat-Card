@@ -41,6 +41,7 @@ var DEFAULT_CONFIG = {
 	speak_button_text: "Speak",
 	speak_button_icon: "mdi:volume-high",
 	speak_button_mode: "both",
+	speak_button_size: "small",
 	show_speak_last_button: false,
 	speak_last_button_text: "Speak last response",
 	speak_last_button_icon: "mdi:volume-high",
@@ -68,6 +69,7 @@ function getStubConfig() {
 		reset_context_button_mode: "text",
 		stop_button_mode: "text",
 		speak_button_mode: "both",
+		speak_button_size: "small",
 		speak_last_button_mode: "icon"
 	};
 }
@@ -95,6 +97,18 @@ function getConfigForm() {
 				"text",
 				"icon",
 				"both"
+			],
+			mode: "dropdown"
+		} }
+	});
+	const size = (name) => ({
+		name,
+		selector: { select: {
+			options: [
+				"tiny",
+				"small",
+				"medium",
+				"large"
 			],
 			mode: "dropdown"
 		} }
@@ -171,6 +185,7 @@ function getConfigForm() {
 				text("speak_button_text"),
 				icon("speak_button_icon"),
 				mode("speak_button_mode"),
+				size("speak_button_size"),
 				toggle("show_speak_last_button"),
 				text("speak_last_button_text"),
 				icon("speak_last_button_icon"),
@@ -273,11 +288,12 @@ function getConfigForm() {
 			show_speak_buttons: "Show Speak under replies",
 			speak_button_text: "Reply button text",
 			speak_button_icon: "Reply button icon",
-			speak_button_mode: "Reply button display",
+			speak_button_mode: "Reply button content",
+			speak_button_size: "Reply button size",
 			show_speak_last_button: "Show Speak last by input",
 			speak_last_button_text: "Last-response button text",
 			speak_last_button_icon: "Last-response button icon",
-			speak_last_button_mode: "Last-response button display",
+			speak_last_button_mode: "Last-response button content",
 			show_clear_button: "Show Clear chat",
 			show_remind_button: "Show Remind agent",
 			show_reset_context_button: "Show Reset context",
@@ -351,6 +367,12 @@ function normalizeConfig(config) {
 		"icon",
 		"both"
 	].includes(config[name])) throw new Error(`${name} must be text, icon or both`);
+	if (config.speak_button_size != null && ![
+		"tiny",
+		"small",
+		"medium",
+		"large"
+	].includes(config.speak_button_size)) throw new Error("speak_button_size must be tiny, small, medium or large");
 	const imageAllowlist = config.image_url_allowlist == null ? [] : (Array.isArray(config.image_url_allowlist) ? config.image_url_allowlist : [config.image_url_allowlist]).map(normalized).filter(Boolean);
 	return {
 		...DEFAULT_CONFIG,
@@ -985,6 +1007,7 @@ var ConversationChatCard = class extends HTMLElement {
 					const actions = document.createElement("div");
 					actions.className = "bubble-actions";
 					const speak = button("speak-response", this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode);
+					speak.dataset.size = this._cfg.speak_button_size;
 					speak.disabled = !this._canSpeak();
 					speak.addEventListener("click", () => this._speakReply(msg.text));
 					actions.append(speak);

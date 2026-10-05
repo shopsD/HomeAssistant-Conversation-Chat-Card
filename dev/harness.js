@@ -47,6 +47,7 @@ card.setConfig({
   tts_voice: 'mock-voice-name',
   tts_current_browser: true,
   show_speak_buttons: true,
+  speak_button_size: 'tiny',
   show_speak_last_button: true,
 });
 

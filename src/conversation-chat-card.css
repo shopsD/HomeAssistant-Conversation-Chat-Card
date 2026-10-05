@@ -140,11 +140,54 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 4px 7px;
   color: var(--secondary-text-color, #666);
   background: transparent;
   border: 1px solid var(--divider-color, #ccc);
   border-radius: 7px;
+}
+
+.speak-response[data-size='tiny'] {
+  gap: 3px;
+  padding: 1px 4px;
+  font-size: 0.7em;
+}
+
+.speak-response[data-size='small'] {
+  gap: 4px;
+  padding: 3px 6px;
+  font-size: 0.84em;
+}
+
+.speak-response[data-size='medium'] {
+  padding: 6px 9px;
+  font-size: 1em;
+}
+
+.speak-response[data-size='large'] {
+  gap: 6px;
+  padding: 9px 12px;
+  font-size: 1.12em;
+}
+
+.speak-response[data-size='tiny'] ha-icon {
+  width: 14px;
+  height: 14px;
+
+  --mdc-icon-size: 14px;
+}
+
+.speak-response[data-size='small'] ha-icon {
+  width: 16px;
+  height: 16px;
+
+  --mdc-icon-size: 16px;
+}
+
+.speak-response[data-size='large'] ha-icon {
+  width: 24px;
+  height: 24px;
+
+  --mdc-icon-size: 24px;
 }
 
 .speak-response:hover {

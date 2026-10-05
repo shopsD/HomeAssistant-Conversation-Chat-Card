@@ -96,6 +96,7 @@ speak_button_size: small
 show_speak_last_button: true
 show_message_copy_button: true
 show_response_copy_button: true
+show_copy_conversation_button: true
 ```
 
 Choose the `tts.*` engine and output destination in the visual editor. Enable `tts_current_browser` to play audio on the device displaying the card. Leave it disabled and choose `tts_media_player` to use Home Assistant's normal media-player output. The boolean is explicit; no entity ID or name such as `browser` has special meaning.
@@ -109,6 +110,8 @@ Markdown is converted to plain text before speech. Welcome messages, thinking, s
 Browser playback uses the Home Assistant TTS engine to generate audio, then plays that audio locally in the dashboard. Browser autoplay policies can block automatic speech until the user has interacted with the page. Manual Speak controls originate from a user click and are generally more reliable. Starting another browser playback stops the card's previous local playback.
 
 Message Copy and Response Copy controls can be enabled independently in the visual editor. The message control copies user messages, while the response control copies completed assistant responses and errors. Each has its own label, icon, feedback label, feedback icon, display mode, and size. Copying preserves the original plain text or Markdown source. After a successful copy, the configured feedback content appears for 1.5 seconds. Manual TTS controls provide the same brief feedback after playback starts.
+
+Copy Conversation adds a configurable header control that copies the visible transcript as labelled `User`, `Assistant`, and `Error` blocks. Pending responses, internal reminder messages, thinking content, and the welcome message are excluded. Remind Agent shares the same transcript selection and formatting, but continues to exclude errors.
 
 ## Conversation storage
 
@@ -240,6 +243,9 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `response_copy_button_text`, `response_copy_button_icon`, `response_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | Response/error Copy button display. |
 | `response_copy_button_feedback_text`, `response_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful response/error copy. |
 | `response_copy_button_size` | `small` | Response/error Copy control size: `tiny`, `small`, `medium`, or `large`. |
+| `show_copy_conversation_button` | `false` | Show a Copy Conversation control in the header. |
+| `copy_conversation_button_text`, `copy_conversation_button_icon`, `copy_conversation_button_mode` | Empty, `mdi:content-copy`, `icon` | Copy Conversation button display. Use `text`, `icon`, or `both`. |
+| `copy_conversation_button_feedback_text`, `copy_conversation_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after copying the transcript. |
 | `show_stop_button` | `true` | Show Stop while a request is pending. |
 | `stop_button_text`, `stop_button_icon`, `stop_button_mode` | `Stop`, `mdi:stop`, `text` | Stop button display. |
 | `show_clear_button` | `true` | Show right-aligned Clear chat control when the header is visible. |

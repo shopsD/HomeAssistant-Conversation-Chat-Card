@@ -14,6 +14,7 @@ var DEFAULT_CONFIG = {
 	show_header: true,
 	show_clear_button: true,
 	show_remind_button: false,
+	show_copy_conversation_button: false,
 	show_reset_context_button: false,
 	show_stop_button: true,
 	allow_local_images: false,
@@ -24,6 +25,11 @@ var DEFAULT_CONFIG = {
 	remind_button_text: "Remind agent",
 	remind_button_icon: "mdi:refresh",
 	remind_button_mode: "text",
+	copy_conversation_button_text: "",
+	copy_conversation_button_icon: "mdi:content-copy",
+	copy_conversation_button_feedback_text: "Copied",
+	copy_conversation_button_feedback_icon: "mdi:check",
+	copy_conversation_button_mode: "icon",
 	reset_context_button_text: "Reset context",
 	reset_context_button_icon: "mdi:restart",
 	reset_context_button_mode: "text",
@@ -71,6 +77,7 @@ function getStubConfig() {
 		agent_picker: true,
 		show_header: true,
 		show_clear_button: true,
+		show_copy_conversation_button: false,
 		show_stop_button: true,
 		show_working_bubbles: true,
 		show_thinking: true,
@@ -84,6 +91,7 @@ function getStubConfig() {
 		send_button_mode: "text",
 		clear_button_mode: "text",
 		remind_button_mode: "text",
+		copy_conversation_button_mode: "icon",
 		reset_context_button_mode: "text",
 		stop_button_mode: "text",
 		speak_button_mode: "both",
@@ -257,6 +265,14 @@ function getConfigForm() {
 				mode("remind_button_mode"),
 				multiline("remind_prompt")
 			]),
+			group("copy_conversation_button", "Copy conversation button", [
+				toggle("show_copy_conversation_button"),
+				mode("copy_conversation_button_mode"),
+				text("copy_conversation_button_text"),
+				icon("copy_conversation_button_icon"),
+				text("copy_conversation_button_feedback_text"),
+				icon("copy_conversation_button_feedback_icon")
+			]),
 			group("reset_context_button", "Reset context button", [
 				toggle("show_reset_context_button"),
 				text("reset_context_button_text"),
@@ -360,6 +376,12 @@ function getConfigForm() {
 			response_copy_button_feedback_icon: "Feedback icon",
 			response_copy_button_mode: "Display",
 			response_copy_button_size: "Size",
+			show_copy_conversation_button: "Show button",
+			copy_conversation_button_text: "Button text",
+			copy_conversation_button_icon: "Icon",
+			copy_conversation_button_feedback_text: "Feedback text",
+			copy_conversation_button_feedback_icon: "Feedback icon",
+			copy_conversation_button_mode: "Button display",
 			show_clear_button: "Show Clear chat",
 			show_remind_button: "Show Remind agent",
 			show_reset_context_button: "Show Reset context",
@@ -423,6 +445,7 @@ function normalizeConfig(config) {
 	for (const name of [
 		"clear_button_mode",
 		"remind_button_mode",
+		"copy_conversation_button_mode",
 		"reset_context_button_mode",
 		"stop_button_mode",
 		"send_button_mode",
@@ -832,6 +855,13 @@ var ConversationChatCard = class extends HTMLElement {
 				this._remindButton.addEventListener("click", () => this._remind());
 				head.append(this._remindButton);
 			} else this._remindButton = null;
+			if (this._cfg.show_copy_conversation_button === true) {
+				this._copyConversationButton = button("copy-conversation", this._cfg.copy_conversation_button_text, this._cfg.copy_conversation_button_icon, this._cfg.copy_conversation_button_mode, "Copy conversation");
+				this._copyConversationButton.addEventListener("click", () => {
+					this._copyConversation();
+				});
+				head.append(this._copyConversationButton);
+			} else this._copyConversationButton = null;
 			if (this._cfg.backend === "home_assistant" && this._cfg.show_reset_context_button === true) {
 				this._resetContextButton = button("reset", this._cfg.reset_context_button_text, this._cfg.reset_context_button_icon, this._cfg.reset_context_button_mode);
 				this._resetContextButton.addEventListener("click", () => this._resetContext());
@@ -854,6 +884,7 @@ var ConversationChatCard = class extends HTMLElement {
 			this._select = null;
 			this._clearButton = null;
 			this._remindButton = null;
+			this._copyConversationButton = null;
 			this._resetContextButton = null;
 		}
 		this._log = document.createElement("div");
@@ -1022,7 +1053,8 @@ var ConversationChatCard = class extends HTMLElement {
 		this._input.disabled = busy;
 		if (this._select) this._select.disabled = busy;
 		if (this._clearButton) this._clearButton.disabled = busy;
-		if (this._remindButton) this._remindButton.disabled = busy || !this._reminderMessages().length;
+		if (this._remindButton) this._remindButton.disabled = busy || !this._transcriptMessages().length;
+		if (this._copyConversationButton) this._copyConversationButton.disabled = busy || !this._transcriptMessages(true).length;
 		if (this._resetContextButton) this._resetContextButton.disabled = busy || !this._conversationId;
 		if (this._stopButton) this._stopButton.hidden = !busy;
 		if (this._speakLastButton) this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();
@@ -1137,7 +1169,8 @@ var ConversationChatCard = class extends HTMLElement {
 			}
 			if (bubble.children.length || msg.role === "user" || msg.role === "error") this._log.append(bubble);
 		}
-		if (this._remindButton) this._remindButton.disabled = this._busy || !this._reminderMessages().length;
+		if (this._remindButton) this._remindButton.disabled = this._busy || !this._transcriptMessages().length;
+		if (this._copyConversationButton) this._copyConversationButton.disabled = this._busy || !this._transcriptMessages(true).length;
 		if (this._resetContextButton) this._resetContextButton.disabled = this._busy || !this._conversationId;
 		if (this._speakLastButton) this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();
 		this._log.scrollTop = this._log.scrollHeight;
@@ -1208,16 +1241,35 @@ var ConversationChatCard = class extends HTMLElement {
 		if (delta.tool_calls) message.status = "Using tools";
 		this._render();
 	}
-	_reminderMessages() {
-		return this._messages.filter((msg) => !msg.pending && !msg.reminder && (msg.role === "user" || msg.role === "assistant") && normalized(msg.text));
+	_transcriptMessages(includeErrors = false) {
+		const roles = includeErrors ? [
+			"user",
+			"assistant",
+			"error"
+		] : ["user", "assistant"];
+		return this._messages.filter((msg) => !msg.pending && !msg.reminder && roles.includes(msg.role) && normalized(msg.text));
+	}
+	_formatTranscript(messages) {
+		const labels = {
+			user: "User",
+			assistant: "Assistant",
+			error: "Error"
+		};
+		return messages.map((msg) => `${labels[msg.role]}: ${msg.text}`).join("\n\n");
+	}
+	async _copyConversation() {
+		if (this._busy) return;
+		const messages = this._transcriptMessages(true);
+		if (!messages.length) return;
+		if (await this._copyText(this._formatTranscript(messages))) showButtonFeedback(this._copyConversationButton, this._cfg.copy_conversation_button_feedback_text, this._cfg.copy_conversation_button_feedback_icon, "Copied conversation");
 	}
 	_remind() {
 		if (this._busy) return;
 		this._expireBeforeSend();
-		const messages = this._reminderMessages();
+		const messages = this._transcriptMessages();
 		if (!messages.length) return;
 		const prompt = safe(this._cfg.remind_prompt || "Here is a reminder of our conversation so far. Use it as context for your next response. Do not repeat the transcript unless asked.");
-		const transcript = messages.map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.text}`).join("\n\n");
+		const transcript = this._formatTranscript(messages);
 		return this._send(`${prompt}\n\n${transcript}`, true);
 	}
 	async _send(overrideText, reminder = false) {

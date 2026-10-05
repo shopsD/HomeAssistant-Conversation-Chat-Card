@@ -50,6 +50,7 @@ card.setConfig({
   welcome: 'This card is running from the local npm development server.',
   show_thinking: true,
   show_clear_button: true,
+  show_remind_button: true,
   show_stop_button: true,
   tts_auto: true,
   tts_entity: 'tts.mock_voice',
@@ -61,6 +62,7 @@ card.setConfig({
   show_speak_last_button: true,
   show_message_copy_button: true,
   show_response_copy_button: true,
+  show_copy_conversation_button: true,
 });
 
 card.hass = {

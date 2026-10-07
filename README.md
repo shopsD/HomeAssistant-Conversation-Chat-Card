@@ -88,12 +88,33 @@ type: custom:conversation-chat-card
 entity: conversation.home_assistant
 tts_auto: true
 tts_entity: tts.google_en_com
-tts_media_player: media_player.kitchen_speaker
+tts_current_browser: true
+tts_voice: YOUR_PROVIDER_VOICE
+show_speak_buttons: true
+speak_button_mode: both
+speak_button_size: small
+show_speak_last_button: true
+show_message_copy_button: true
+show_resend_message_button: true
+show_response_copy_button: true
+show_copy_conversation_button: true
 ```
 
-Choose the `tts.*` engine or voice and the `media_player.*` playback destination in the visual editor. Both are required when `tts_auto` is enabled. The optional `tts_language` value is passed to the selected provider, and `tts_cache` controls Home Assistant's generated-speech cache (enabled by default).
+Choose the `tts.*` engine and output destination in the visual editor. Enable `tts_current_browser` to play audio on the device displaying the card. Leave it disabled and choose `tts_media_player` to use Home Assistant's normal media-player output. The boolean is explicit; no entity ID or name such as `browser` has special meaning.
 
-The card speaks each newly completed assistant reply once, after streaming has finished. Markdown is converted to plain text first. Welcome messages, restored conversation history, thinking, stopped requests, and errors are not spoken. TTS service failures are logged without replacing the successful text reply. The dashboard user must be allowed to call the selected TTS service and media player.
+The optional free-text `tts_voice` value is passed to the provider as `options.voice`, while `tts_language` is passed as the action language. Supported voice names and languages depend on the selected provider. `tts_cache` controls Home Assistant's generated-speech cache and is enabled by default.
+
+With `tts_auto`, the card speaks each newly completed assistant reply once, after streaming has finished. `show_speak_buttons` adds a configurable Speak control beneath every completed assistant reply, including restored replies. Its label, icon, `text`/`icon`/`both` content mode, and `tiny`/`small`/`medium`/`large` size can be configured. `show_speak_last_button` adds a configurable control immediately left of the message input for replaying the most recent completed response. Manual controls work without `tts_auto`.
+
+Markdown is converted to plain text before speech. Welcome messages, thinking, stopped requests, and errors are not spoken automatically or offered as manual responses. TTS failures are logged without replacing the text reply. The dashboard user must have access to the selected TTS engine and, for media-player output, the selected media player.
+
+Browser playback uses the Home Assistant TTS engine to generate audio, then plays that audio locally in the dashboard. Browser autoplay policies can block automatic speech until the user has interacted with the page. Manual Speak controls originate from a user click and are generally more reliable. Starting another browser playback stops the card's previous local playback.
+
+Message Copy and Response Copy controls can be enabled independently in the visual editor. The message control copies user messages, while the response control copies completed assistant responses and errors. Each has its own label, icon, feedback label, feedback icon, display mode, and size. Copying preserves the original plain text or Markdown source. After a successful copy, the configured feedback content appears for 1.5 seconds. Manual TTS controls provide the same brief feedback after playback starts.
+
+Copy Conversation adds a configurable header control that copies the visible transcript as labelled `User`, `Assistant`, and `Error` blocks. Pending responses, internal reminder messages, thinking content, and the welcome message are excluded. Remind Agent shares the same transcript selection and formatting, but continues to exclude errors.
+
+Resend Message adds a configurable control beside Message Copy on only the most recent user message. It permanently removes everything displayed after that message, keeps the user message visible once, and submits it again. This is a UI-level retry: Home Assistant's existing conversation context is retained and may still contain the removed response.
 
 ## Conversation storage
 
@@ -204,10 +225,34 @@ Only HTTP and HTTPS images are accepted. URLs containing embedded credentials an
 | `working_message` | Empty | Optional waiting text. |
 | `show_working_bubbles` | `true` | Show animated waiting dots. |
 | `tts_auto` | `false` | Automatically speak each new completed assistant reply. |
-| `tts_entity` | None | Home Assistant `tts.*` engine or voice. Required with `tts_auto`. |
-| `tts_media_player` | None | Home Assistant `media_player.*` playback destination. Required with `tts_auto`. |
+| `tts_entity` | None | Home Assistant `tts.*` engine. Required for automatic or manual speech. |
+| `tts_current_browser` | `false` | Play generated speech on the browser displaying this card. |
+| `tts_media_player` | None | Home Assistant `media_player.*` destination used when browser playback is disabled. |
 | `tts_language` | None | Optional language code passed to the TTS provider. |
+| `tts_voice` | None | Optional provider-specific voice name passed as `options.voice`. |
 | `tts_cache` | `true` | Allow Home Assistant to cache generated speech. |
+| `show_speak_buttons` | `false` | Show a Speak control beneath completed assistant replies. |
+| `speak_button_text`, `speak_button_icon`, `speak_button_mode` | Empty, `mdi:volume-high`, `both` | Per-response content. Use `text`, `icon`, or `both`. |
+| `speak_button_feedback_text`, `speak_button_feedback_icon` | `Speaking`, `mdi:check` | Brief per-response feedback after speech starts. |
+| `speak_button_size` | `small` | Per-response control size: `tiny`, `small`, `medium`, or `large`. |
+| `show_speak_last_button` | `false` | Show a Speak last response control left of the message input. |
+| `speak_last_button_text`, `speak_last_button_icon`, `speak_last_button_mode` | Empty, `mdi:volume-high`, `icon` | Footer Speak button display. |
+| `speak_last_button_feedback_text`, `speak_last_button_feedback_icon` | `Speaking`, `mdi:check` | Brief footer feedback after speech starts. |
+| `show_message_copy_button` | `false` | Show a Copy control beneath user messages. |
+| `message_copy_button_text`, `message_copy_button_icon`, `message_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | User-message Copy button display. |
+| `message_copy_button_feedback_text`, `message_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful user-message copy. |
+| `message_copy_button_size` | `small` | User-message Copy control size: `tiny`, `small`, `medium`, or `large`. |
+| `show_resend_message_button` | `false` | Show Resend beside Message Copy on the most recent user message. |
+| `resend_message_button_text`, `resend_message_button_icon`, `resend_message_button_mode` | Empty, `mdi:refresh`, `icon` | Resend Message button display. Use `text`, `icon`, or `both`. |
+| `resend_message_button_feedback_text`, `resend_message_button_feedback_icon` | `Resending`, `mdi:refresh` | Content displayed while the replacement response is pending. |
+| `resend_message_button_size` | `small` | Resend Message control size: `tiny`, `small`, `medium`, or `large`. |
+| `show_response_copy_button` | `false` | Show a Copy control beneath assistant responses and errors. |
+| `response_copy_button_text`, `response_copy_button_icon`, `response_copy_button_mode` | `Copy to clipboard`, `mdi:content-copy`, `both` | Response/error Copy button display. |
+| `response_copy_button_feedback_text`, `response_copy_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after a successful response/error copy. |
+| `response_copy_button_size` | `small` | Response/error Copy control size: `tiny`, `small`, `medium`, or `large`. |
+| `show_copy_conversation_button` | `false` | Show a Copy Conversation control in the header. |
+| `copy_conversation_button_text`, `copy_conversation_button_icon`, `copy_conversation_button_mode` | Empty, `mdi:content-copy`, `icon` | Copy Conversation button display. Use `text`, `icon`, or `both`. |
+| `copy_conversation_button_feedback_text`, `copy_conversation_button_feedback_icon` | `Copied`, `mdi:check` | Brief feedback after copying the transcript. |
 | `show_stop_button` | `true` | Show Stop while a request is pending. |
 | `stop_button_text`, `stop_button_icon`, `stop_button_mode` | `Stop`, `mdi:stop`, `text` | Stop button display. |
 | `show_clear_button` | `true` | Show right-aligned Clear chat control when the header is visible. |

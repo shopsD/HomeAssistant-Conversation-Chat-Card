@@ -4,29 +4,51 @@ import { runChatCompletions } from './backends/chat-completions.js';
 import { pipelineForAgent, runAssistPipeline, runConversationProcess } from './backends/home-assistant.js';
 import { renderMarkdown } from './markdown.js';
 import { clearStoredConversation, createStorageKey, readStoredConversation, writeStoredConversation } from './storage.js';
-import { speakText } from './text-to-speech.js';
+import { canSpeak, speakText } from './text-to-speech.js';
 import { normalized, safe, unique } from './utils.js';
 
 const TAG = 'conversation-chat-card';
-const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), import.meta.url).href;
-const button = (className, label, icon, mode) => {
+const moduleUrl = new URL(import.meta.url);
+const stylesheetUrl = new URL(emittedStylesheetUrl.split('/').pop(), moduleUrl);
+stylesheetUrl.search = moduleUrl.search;
+const BUTTON_FEEDBACK_MS = 1500;
+const buttonContent = new WeakMap();
+const buttonFeedbackTimers = new WeakMap();
+const renderButtonContent = (el, content) => {
+  el.replaceChildren();
+  el.setAttribute('aria-label', safe(content.ariaLabel));
+  if (content.mode === 'icon' || content.mode === 'both') {
+    const glyph = document.createElement('ha-icon');
+    glyph.setAttribute('icon', safe(content.icon));
+    glyph.setAttribute('aria-hidden', 'true');
+    el.append(glyph);
+  }
+  if (content.mode !== 'icon' && safe(content.label)) {
+    const span = document.createElement('span');
+    span.textContent = safe(content.label);
+    el.append(span);
+  }
+};
+const button = (className, label, icon, mode, ariaLabel = label) => {
   const el = document.createElement('button'); 
   el.type = 'button';
   el.className = className;
-  el.setAttribute('aria-label', safe(label));
-  
-  if (mode === 'icon' || mode === 'both') {
-    const glyph = document.createElement('ha-icon'); 
-    glyph.setAttribute('icon', safe(icon)); 
-    glyph.setAttribute('aria-hidden', 'true'); 
-    el.append(glyph);
-  }
-  if (mode !== 'icon') {
-    const span = document.createElement('span'); 
-    span.textContent = safe(label); 
-    el.append(span); 
-  }
+  const content = { label, icon, mode, ariaLabel };
+  buttonContent.set(el, content);
+  renderButtonContent(el, content);
   return el;
+};
+const showButtonFeedback = (el, label, icon, ariaLabel) => {
+  const original = buttonContent.get(el);
+  if (!original) { return; }
+  clearTimeout(buttonFeedbackTimers.get(el));
+  renderButtonContent(el, { label, icon, mode: original.mode, ariaLabel });
+  el.dataset.feedback = 'true';
+  buttonFeedbackTimers.set(el, setTimeout(() => {
+    renderButtonContent(el, original);
+    delete el.dataset.feedback;
+    buttonFeedbackTimers.delete(el);
+  }, BUTTON_FEEDBACK_MS));
 };
 
 export class ConversationChatCard extends HTMLElement {
@@ -66,6 +88,10 @@ export class ConversationChatCard extends HTMLElement {
         this._mount();
       }
     }
+    disconnectedCallback() {
+      this._audio?.pause();
+      this._audio = null;
+    }
     _mount() {
       if (!this._cfg) { return; }
       this.shadowRoot.replaceChildren();
@@ -90,6 +116,14 @@ export class ConversationChatCard extends HTMLElement {
           head.append(this._remindButton);
         } else {
           this._remindButton = null;
+        }
+
+        if (this._cfg.show_copy_conversation_button === true) {
+          this._copyConversationButton = button('copy-conversation', this._cfg.copy_conversation_button_text, this._cfg.copy_conversation_button_icon, this._cfg.copy_conversation_button_mode, 'Copy conversation');
+          this._copyConversationButton.addEventListener('click', () => { void this._copyConversation(); });
+          head.append(this._copyConversationButton);
+        } else {
+          this._copyConversationButton = null;
         }
         
         if (this._cfg.backend === 'home_assistant' && this._cfg.show_reset_context_button === true) {
@@ -124,6 +158,7 @@ export class ConversationChatCard extends HTMLElement {
         this._select = null; 
         this._clearButton = null; 
         this._remindButton = null; 
+        this._copyConversationButton = null;
         this._resetContextButton = null;
       }
       this._log = document.createElement('div'); 
@@ -151,6 +186,15 @@ export class ConversationChatCard extends HTMLElement {
       const send = button('send', this._cfg.send_button_text, this._cfg.send_button_icon, this._cfg.send_button_mode);
       send.addEventListener('click', () => this._send()); 
       this._sendButton = send;
+      this._speakLastButton = this._cfg.show_speak_last_button === true ? button('speak-last', this._cfg.speak_last_button_text, this._cfg.speak_last_button_icon, this._cfg.speak_last_button_mode, 'Speak last response') : null;
+      if (this._speakLastButton) {
+        this._speakLastButton.addEventListener('click', async () => {
+          if (await this._speakLastReply()) {
+            showButtonFeedback(this._speakLastButton, this._cfg.speak_last_button_feedback_text, this._cfg.speak_last_button_feedback_icon, 'Speaking last response');
+          }
+        });
+        foot.append(this._speakLastButton);
+      }
       foot.append(this._input); 
       if (this._stopButton) {
         foot.append(this._stopButton); 
@@ -284,9 +328,11 @@ export class ConversationChatCard extends HTMLElement {
       this._busy = busy; this._sendButton.disabled = busy; this._input.disabled = busy;
       if (this._select){ this._select.disabled = busy;}
       if (this._clearButton) {this._clearButton.disabled = busy;}
-      if (this._remindButton) {this._remindButton.disabled = busy || !this._reminderMessages().length;}
+      if (this._remindButton) {this._remindButton.disabled = busy || !this._transcriptMessages().length;}
+      if (this._copyConversationButton) {this._copyConversationButton.disabled = busy || !this._transcriptMessages(true).length;}
       if (this._resetContextButton) {this._resetContextButton.disabled = busy || !this._conversationId;}
       if (this._stopButton) {this._stopButton.hidden = !busy;}
+      if (this._speakLastButton) {this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();}
       if (!busy) {this._input.focus();}
     }
     _imagePatternMatches(url, pattern) {
@@ -332,10 +378,26 @@ export class ConversationChatCard extends HTMLElement {
         hint.textContent = safe(this._cfg.welcome || 'Start a conversation');
         this._log.append(hint);
       }
+      const resendableMessage = this._lastResendableMessage();
+      const hasPendingMessage = this._messages.some(message => message.pending);
       for (const msg of this._messages) {
         const bubble = document.createElement('div'); bubble.className = `bubble ${msg.role}`;
         if (msg.role === 'user' || msg.role === 'error') {
           bubble.textContent = msg.text;
+          const isMessage = msg.role === 'user';
+          const showCopy = isMessage ? this._cfg.show_message_copy_button : this._cfg.show_response_copy_button;
+          const showResend = isMessage && msg === resendableMessage && this._cfg.show_resend_message_button === true && (!hasPendingMessage || msg.resending);
+          if (msg.text && (showCopy === true || showResend)) {
+            const actions = document.createElement('div');
+            actions.className = 'bubble-actions';
+            if (showCopy === true) {
+              actions.append(this._copyButton(msg.text, isMessage ? 'message' : 'response'));
+            }
+            if (showResend) {
+              actions.append(this._resendButton(msg));
+            }
+            bubble.append(actions);
+          }
         }else {
           if (msg.thinking && this._cfg.show_thinking !== false) {
             const details = document.createElement('details'); 
@@ -373,12 +435,84 @@ export class ConversationChatCard extends HTMLElement {
             body.innerHTML = this._markdown(msg.text);
              bubble.append(body);
           }
+          if (!msg.pending && msg.text && (this._cfg.show_speak_buttons === true || this._cfg.show_response_copy_button === true)) {
+            const actions = document.createElement('div');
+            actions.className = 'bubble-actions';
+            if (this._cfg.show_speak_buttons === true) {
+              const speak = button('speak-response', this._cfg.speak_button_text, this._cfg.speak_button_icon, this._cfg.speak_button_mode, 'Speak response');
+              speak.dataset.size = this._cfg.speak_button_size;
+              speak.disabled = !this._canSpeak();
+              speak.addEventListener('click', async () => {
+                if (await this._speakReply(msg.text)) {
+                  showButtonFeedback(speak, this._cfg.speak_button_feedback_text, this._cfg.speak_button_feedback_icon, 'Speaking response');
+                }
+              });
+              actions.append(speak);
+            }
+            if (this._cfg.show_response_copy_button === true) {
+              actions.append(this._copyButton(msg.text, 'response'));
+            }
+            bubble.append(actions);
+          }
         }
         if (bubble.children.length || msg.role === 'user' || msg.role === 'error') {this._log.append(bubble);}
       }
-      if (this._remindButton){ this._remindButton.disabled = this._busy || !this._reminderMessages().length;}
+      if (this._remindButton){ this._remindButton.disabled = this._busy || !this._transcriptMessages().length;}
+      if (this._copyConversationButton) {this._copyConversationButton.disabled = this._busy || !this._transcriptMessages(true).length;}
       if (this._resetContextButton) {this._resetContextButton.disabled = this._busy || !this._conversationId;}
+      if (this._speakLastButton) {this._speakLastButton.disabled = !this._canSpeak() || !this._lastSpeakableMessage();}
       this._log.scrollTop = this._log.scrollHeight;
+    }
+    _copyButton(text, type) {
+      const isMessage = type === 'message';
+      const prefix = isMessage ? 'message_copy_button' : 'response_copy_button';
+      const copy = button(`copy-${type}`, this._cfg[`${prefix}_text`], this._cfg[`${prefix}_icon`], this._cfg[`${prefix}_mode`], `Copy ${type}`);
+      copy.dataset.size = this._cfg[`${prefix}_size`];
+      copy.addEventListener('click', async () => {
+        if (await this._copyText(text)) {
+          showButtonFeedback(copy, this._cfg[`${prefix}_feedback_text`], this._cfg[`${prefix}_feedback_icon`], `Copied ${type}`);
+        }
+      });
+      return copy;
+    }
+    _resendButton(message) {
+      const feedback = message.resending === true;
+      const resend = button('resend-message', feedback ? this._cfg.resend_message_button_feedback_text : this._cfg.resend_message_button_text, feedback ? this._cfg.resend_message_button_feedback_icon : this._cfg.resend_message_button_icon, this._cfg.resend_message_button_mode, feedback ? 'Resending message' : 'Resend message');
+      resend.dataset.size = this._cfg.resend_message_button_size;
+      resend.disabled = feedback;
+      if (feedback) {
+        resend.dataset.feedback = 'true';
+      } else {
+        resend.addEventListener('click', () => { void this._resendMessage(message); });
+      }
+      return resend;
+    }
+    async _copyText(text) {
+      const value = safe(text);
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(value);
+          return true;
+        } catch {}
+      }
+      let field;
+      try {
+        field = document.createElement('textarea');
+        field.value = value;
+        field.setAttribute('readonly', '');
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.append(field);
+        field.select();
+        const copied = document.execCommand('copy');
+        if (!copied) { throw new Error('The browser rejected the copy command'); }
+        return true;
+      } catch (error) {
+        console.warn(TAG, 'Could not copy message', error);
+        return false;
+      } finally {
+        field?.remove();
+      }
     }
     _splitThinking(message) {
       const source = safe(message.raw || message.text);
@@ -410,29 +544,70 @@ export class ConversationChatCard extends HTMLElement {
       if (delta.tool_calls) {message.status = 'Using tools';}
       this._render();
     }
-    _reminderMessages() { 
-      return this._messages.filter(msg => !msg.pending && !msg.reminder && (msg.role === 'user' || msg.role === 'assistant') && normalized(msg.text)); 
+    _transcriptMessages(includeErrors = false) {
+      const roles = includeErrors ? ['user', 'assistant', 'error'] : ['user', 'assistant'];
+      return this._messages.filter(msg => !msg.pending && !msg.reminder && roles.includes(msg.role) && normalized(msg.text));
+    }
+    _formatTranscript(messages) {
+      const labels = { user: 'User', assistant: 'Assistant', error: 'Error' };
+      return messages.map(msg => `${labels[msg.role]}: ${msg.text}`).join('\n\n');
+    }
+    _lastResendableMessage() {
+      for (let index = this._messages.length - 1; index >= 0; index--) {
+        const message = this._messages[index];
+        if (message.role === 'user' && !message.reminder && normalized(message.text)) {
+          return message;
+        }
+      }
+      return null;
+    }
+    async _resendMessage(message) {
+      if (this._busy || !this._hass) { return; }
+      this._expireBeforeSend();
+      if (message !== this._lastResendableMessage()) { return; }
+      const index = this._messages.indexOf(message);
+      if (index < 0) { return; }
+      this._messages.splice(index + 1);
+      message.resending = true;
+      try {
+        await this._send(message.text, false, message);
+      } finally {
+        delete message.resending;
+        this._render();
+        this._save();
+      }
+    }
+    async _copyConversation() {
+      if (this._busy) { return; }
+      const messages = this._transcriptMessages(true);
+      if (!messages.length) { return; }
+      if (await this._copyText(this._formatTranscript(messages))) {
+        showButtonFeedback(this._copyConversationButton, this._cfg.copy_conversation_button_feedback_text, this._cfg.copy_conversation_button_feedback_icon, 'Copied conversation');
+      }
     }
     _remind() {
       if (this._busy) { return; }
       this._expireBeforeSend();
-      const messages = this._reminderMessages();
+      const messages = this._transcriptMessages();
       if (!messages.length) { return; }
       const prompt = safe(this._cfg.remind_prompt || 'Here is a reminder of our conversation so far. Use it as context for your next response. Do not repeat the transcript unless asked.');
-      const transcript = messages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}`).join('\n\n');
+      const transcript = this._formatTranscript(messages);
       return this._send(`${prompt}\n\n${transcript}`, true);
     }
-    async _send(overrideText, reminder = false) {
+    async _send(overrideText, reminder = false, existingMessage = null) {
       if (this._busy || !this._hass) { return; }
       const text = normalized(overrideText === undefined ? this._input.value : overrideText);
       if (!text) { return; }
       this._expireBeforeSend();
+      if (existingMessage && !this._messages.includes(existingMessage)) { return; }
       if (this._cfg.backend === 'home_assistant' && !this._agent) { 
         this._showError('No conversation agent is available'); 
         return; 
       }
-      if (!reminder) {this._input.value = '';}
-      this._messages.push({ role: 'user', text: reminder ? safe(this._cfg.remind_button_text) : text, reminder });
+      if (!reminder && !existingMessage) {this._input.value = '';}
+      if (!existingMessage) {
+        this._messages.push({ role: 'user', text: reminder ? safe(this._cfg.remind_button_text) : text, reminder });
+      }
       const reply = { role: 'assistant', text: '', thinking: '', pending: true };
       this._messages.push(reply); 
       this._render(); 
@@ -467,7 +642,7 @@ export class ConversationChatCard extends HTMLElement {
           this._busyState(false); 
           this._render(); 
           this._save(); 
-          if (reply.role === 'assistant') {
+          if (reply.role === 'assistant' && this._cfg.tts_auto === true) {
             void this._speakReply(reply.text);
           }
         }
@@ -483,10 +658,44 @@ export class ConversationChatCard extends HTMLElement {
         block.append(' ');
       }
       try {
-        await speakText(this._hass, this._cfg, content.textContent);
+        await speakText(this._hass, this._cfg, content.textContent, source => this._playBrowserAudio(source));
+        return true;
       } catch (error) {
         console.warn(TAG, 'Could not speak assistant reply', error);
+        return false;
       }
+    }
+    _canSpeak() {
+      return canSpeak(this._hass, this._cfg);
+    }
+    async _playBrowserAudio(source) {
+      if (this._audio) {
+        this._audio.pause();
+      }
+      const audio = new Audio(source);
+      this._audio = audio;
+      audio.addEventListener('ended', () => {
+        if (this._audio === audio) {
+          this._audio = null;
+        }
+      }, { once: true });
+      await audio.play();
+    }
+    _lastSpeakableMessage() {
+      for (let index = this._messages.length - 1; index >= 0; index--) {
+        const message = this._messages[index];
+        if (message.role === 'assistant' && !message.pending && normalized(message.text)) {
+          return message;
+        }
+      }
+      return null;
+    }
+    async _speakLastReply() {
+      const message = this._lastSpeakableMessage();
+      if (message) {
+        return this._speakReply(message.text);
+      }
+      return false;
     }
     _pipelineForAgent() {
       return pipelineForAgent(this._cfg, this._agent);

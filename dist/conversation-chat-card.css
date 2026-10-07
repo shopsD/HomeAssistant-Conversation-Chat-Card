@@ -53,6 +53,7 @@ button:disabled {
 
 .clear,
 .remind,
+.copy-conversation,
 .reset {
   display: inline-flex;
   align-items: center;
@@ -75,18 +76,29 @@ button:disabled {
 }
 
 .remind,
+.copy-conversation,
 .reset {
   color: var(--primary-text-color);
 }
 
+.copy-conversation {
+  color: var(--secondary-text-color, #666);
+  background: transparent;
+  border: 1px solid var(--divider-color, #ccc);
+}
+
 .remind:hover,
+.copy-conversation:hover,
 .reset:hover {
   background: var(--secondary-background-color, #eee);
 }
 
 .clear ha-icon,
 .remind ha-icon,
+.copy-conversation ha-icon,
 .reset ha-icon,
+.bubble-actions ha-icon,
+.speak-last ha-icon,
 .stop ha-icon,
 .send ha-icon {
   width: 20px;
@@ -126,6 +138,89 @@ button:disabled {
 .assistant {
   align-self: flex-start;
   background: var(--secondary-background-color, #eee);
+}
+
+.bubble-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bubble-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--secondary-text-color, #666);
+  background: transparent;
+  border: 1px solid var(--divider-color, #ccc);
+  border-radius: 7px;
+}
+
+.bubble-actions button[data-size='tiny'] {
+  gap: 3px;
+  padding: 1px 4px;
+  font-size: 0.7em;
+}
+
+.bubble-actions button[data-size='small'] {
+  gap: 4px;
+  padding: 3px 6px;
+  font-size: 0.84em;
+}
+
+.bubble-actions button[data-size='medium'] {
+  padding: 6px 9px;
+  font-size: 1em;
+}
+
+.bubble-actions button[data-size='large'] {
+  gap: 6px;
+  padding: 9px 12px;
+  font-size: 1.12em;
+}
+
+.bubble-actions button[data-size='tiny'] ha-icon {
+  width: 14px;
+  height: 14px;
+
+  --mdc-icon-size: 14px;
+}
+
+.bubble-actions button[data-size='small'] ha-icon {
+  width: 16px;
+  height: 16px;
+
+  --mdc-icon-size: 16px;
+}
+
+.bubble-actions button[data-size='large'] ha-icon {
+  width: 24px;
+  height: 24px;
+
+  --mdc-icon-size: 24px;
+}
+
+.bubble-actions button:hover {
+  background: rgb(128 128 128 / 10%);
+}
+
+.user .bubble-actions button {
+  color: var(--text-primary-color, #fff);
+  border-color: rgb(255 255 255 / 60%);
+}
+
+.user .bubble-actions button:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+.bubble-actions button[data-feedback='true'],
+.copy-conversation[data-feedback='true'],
+.speak-last[data-feedback='true'] {
+  color: var(--success-color, #2e7d32);
+  background: rgb(76 175 80 / 14%);
+  box-shadow: inset 0 0 0 1px currentcolor;
 }
 
 .error {
@@ -284,6 +379,7 @@ textarea {
 }
 
 .send,
+.speak-last,
 .stop {
   display: inline-flex;
   min-height: 40px;
@@ -298,6 +394,11 @@ textarea {
 
 .send {
   background: var(--primary-color, #03a9f4);
+}
+
+.speak-last {
+  color: var(--primary-text-color);
+  background: var(--secondary-background-color, #eee);
 }
 
 .stop {
